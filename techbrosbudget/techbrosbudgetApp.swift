@@ -11,7 +11,18 @@ import SwiftUI
 struct techbrosbudgetApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(store: launchStore)
         }
+    }
+
+    @MainActor
+    private var launchStore: BudgetStore? {
+        guard ProcessInfo.processInfo.arguments.contains("UITEST_PREVIEW_DATA")
+            || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        else {
+            return nil
+        }
+
+        return .preview
     }
 }

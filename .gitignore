@@ -1,0 +1,29 @@
+# Xcode user state
+xcuserdata/
+**/xcuserdata/
+*.xcuserstate
+
+# Local build products
+DerivedData/
+build/
+Build/
+*.xcarchive
+*.dSYM/
+*.ipa
+.asc/artifacts/
+
+# SwiftPM local state
+.build/
+.swiftpm/
+
+# Local configuration and secrets
+.env
+.env.*
+.asc/config.json
+*.p8
+*.p12
+*.mobileprovision
+*.provisionprofile
+
+# macOS
+.DS_Store

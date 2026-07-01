@@ -1,0 +1,181 @@
+name: iOS
+
+on:
+  pull_request:
+  push:
+    branches:
+      - dev
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: Release lane to run.
+        required: true
+        default: external-testflight
+        type: choice
+        options:
+          - external-testflight
+          - appstore
+      version:
+        description: Marketing version to build.
+        required: true
+        default: "0.1"
+        type: string
+      submit_external_review:
+        description: Submit external TestFlight build for beta review.
+        required: true
+        default: true
+        type: boolean
+      submit_app_review:
+        description: Submit the App Store build for review.
+        required: true
+        default: false
+        type: boolean
+
+env:
+  PROJECT_PATH: techbrosbudget.xcodeproj
+  SCHEME: techbrosbudget
+  CONFIGURATION: Release
+  DEFAULT_IOS_MARKETING_VERSION: "0.1"
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and Test iOS ${{ matrix.ios-version }} (${{ matrix.test-scope }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ios-version: "26.5"
+            test-scope: full
+          - ios-version: "27.0"
+            test-scope: unit
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+
+      - name: Ensure iOS simulator runtime
+        env:
+          IOS_RUNTIME_VERSION: ${{ matrix.ios-version }}
+        run: |
+          if xcrun simctl list runtimes available | grep -F "iOS ${IOS_RUNTIME_VERSION} " >/dev/null; then
+            echo "iOS ${IOS_RUNTIME_VERSION} simulator runtime is already installed."
+          else
+            xcodebuild -downloadPlatform iOS -buildVersion "$IOS_RUNTIME_VERSION"
+          fi
+
+      - name: Select simulator
+        id: simulator
+        env:
+          IOS_RUNTIME_VERSION: ${{ matrix.ios-version }}
+        run: |
+          SIMULATOR_ID="$(scripts/ci/select-ios-simulator.sh "$IOS_RUNTIME_VERSION")"
+          echo "id=${SIMULATOR_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        env:
+          TEST_SCOPE: ${{ matrix.test-scope }}
+        run: |
+          test_args=()
+          if [[ "$TEST_SCOPE" == "unit" ]]; then
+            test_args=(-only-testing:techbrosbudgetTests)
+          fi
+
+          xcodebuild test \
+            -project "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            "${test_args[@]}"
+
+  external-testflight:
+    name: External TestFlight
+    needs: test
+    runs-on: macos-latest
+    if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.lane == 'external-testflight')
+    environment: testflight-external
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install release tooling
+        run: brew install asc jq
+
+      - name: Configure App Store Connect API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: scripts/ci/setup-asc-key.sh
+
+      - name: Publish external TestFlight build
+        env:
+          ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          IOS_MARKETING_VERSION: ${{ inputs.version || vars.IOS_MARKETING_VERSION }}
+          TESTFLIGHT_GROUP: ${{ vars.TESTFLIGHT_EXTERNAL_GROUP }}
+          WORKFLOW_SUBMIT_EXTERNAL_REVIEW: ${{ inputs.submit_external_review }}
+        run: |
+          export IOS_MARKETING_VERSION="${IOS_MARKETING_VERSION:-$DEFAULT_IOS_MARKETING_VERSION}"
+          export TESTFLIGHT_GROUP="${TESTFLIGHT_GROUP:-Tech Bros Budget Beta}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            export SUBMIT_EXTERNAL_REVIEW="${WORKFLOW_SUBMIT_EXTERNAL_REVIEW:-false}"
+          else
+            export SUBMIT_EXTERNAL_REVIEW="true"
+          fi
+          scripts/ci/publish-testflight.sh
+
+  appstore:
+    name: App Store Release
+    needs: test
+    runs-on: macos-latest
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.lane == 'appstore')
+    environment: appstore-production
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install release tooling
+        run: brew install asc jq
+
+      - name: Configure App Store Connect API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: scripts/ci/setup-asc-key.sh
+
+      - name: Publish App Store build
+        env:
+          ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          WORKFLOW_VERSION: ${{ inputs.version }}
+          WORKFLOW_SUBMIT_APP_REVIEW: ${{ inputs.submit_app_review }}
+        run: |
+          if [[ -n "${WORKFLOW_VERSION:-}" ]]; then
+            export IOS_MARKETING_VERSION="$WORKFLOW_VERSION"
+          else
+            export IOS_MARKETING_VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            export SUBMIT_APP_REVIEW="${WORKFLOW_SUBMIT_APP_REVIEW:-false}"
+          else
+            export SUBMIT_APP_REVIEW="true"
+          fi
+          scripts/ci/publish-appstore.sh
