@@ -1,0 +1,215 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Add ${amount} spent on ${note}" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add ${amount} spent on ${note}"
+          }
+        }
+      }
+    },
+    "Add Expense" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Expense"
+          }
+        }
+      }
+    },
+    "Amount" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Amount"
+          }
+        }
+      }
+    },
+    "Choose Amount" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Amount"
+          }
+        }
+      }
+    },
+    "Choose whether the small widget shows monthly, weekly, or daily spending." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose whether the small widget shows monthly, weekly, or daily spending."
+          }
+        }
+      }
+    },
+    "Daily" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daily"
+          }
+        }
+      }
+    },
+    "Expense" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expense"
+          }
+        }
+      }
+    },
+    "Monthly" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly"
+          }
+        }
+      }
+    },
+    "Record ${spokenExpense}" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record ${spokenExpense}"
+          }
+        }
+      }
+    },
+    "Record Spoken Expense" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Record Spoken Expense"
+          }
+        }
+      }
+    },
+    "Records a dictated expense such as '74 on coffee' in Tech Bros Budget." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Records a dictated expense such as '74 on coffee' in Tech Bros Budget."
+          }
+        }
+      }
+    },
+    "Records an expense in Tech Bros Budget from Siri or Shortcuts." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Records an expense in Tech Bros Budget from Siri or Shortcuts."
+          }
+        }
+      }
+    },
+    "The amount and what it was for, such as '74 on coffee'." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The amount and what it was for, such as '74 on coffee'."
+          }
+        }
+      }
+    },
+    "The amount spent." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The amount spent."
+          }
+        }
+      }
+    },
+    "Weekly" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weekly"
+          }
+        }
+      }
+    },
+    "What the money was spent on." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What the money was spent on."
+          }
+        }
+      }
+    },
+    "budget" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "budget"
+          }
+        }
+      }
+    },
+    "spending" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "spending"
+          }
+        }
+      }
+    },
+    "transaction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "transaction"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.1"
+}
