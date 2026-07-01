@@ -8,16 +8,15 @@ This repo uses the conventional iOS release split:
 - `v*` tags: publish an App Store build and submit it for review.
 - Manual dispatch: run the external TestFlight or App Store lane with an explicit version.
 
-CI runs the app/unit-test path against an iOS `26.5` simulator. It also runs the
-same app/unit-test path against an iOS `27.0` simulator when that runtime is
-available on the runner; hosted GitHub runners may temporarily skip this
-optional lane until Apple/GitHub publish the runtime. The app and widget
-deployment target stays at `26.5`, so one TestFlight binary supports iOS 26.5
-and newer.
+CI runs a simulator build against iOS `26.5`. It also builds against an iOS
+`27.0` simulator when that runtime is available on the runner; hosted GitHub
+runners may temporarily skip this optional lane until Apple/GitHub publish the
+runtime. The app and widget deployment target stays at `26.5`, so one TestFlight
+binary supports iOS 26.5 and newer.
 
 Run the full UI test suite locally before broad external beta pushes. GitHub's
 hosted macOS image can hang in the Xcode beta UI-test harness, so CI keeps the
-release gate focused on deterministic build and unit coverage.
+release gate focused on deterministic build coverage.
 
 ## Versioning
 

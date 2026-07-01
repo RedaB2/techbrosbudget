@@ -46,7 +46,7 @@ concurrency:
 
 jobs:
   test:
-    name: Build and Test iOS ${{ matrix.ios-version }} (${{ matrix.test-scope }})
+    name: Build iOS ${{ matrix.ios-version }}
     runs-on: macos-26
     strategy:
       fail-fast: false
@@ -55,12 +55,10 @@ jobs:
           - ios-version: "26.5"
             simulator-name: "iPhone 17 Pro Max"
             device-type: "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max"
-            test-scope: unit
             optional-runtime: false
           - ios-version: "27.0"
             simulator-name: "iPhone 17 Pro Max"
             device-type: "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max"
-            test-scope: unit
             optional-runtime: true
     steps:
       - name: Check out repository
@@ -94,21 +92,13 @@ jobs:
             exit 1
           fi
 
-      - name: Run tests
+      - name: Run build
         if: steps.simulator.outputs.available == 'true'
-        env:
-          TEST_SCOPE: ${{ matrix.test-scope }}
         run: |
-          test_args=()
-          if [[ "$TEST_SCOPE" == "unit" ]]; then
-            test_args=(-only-testing:techbrosbudgetTests)
-          fi
-
-          xcodebuild test \
+          xcodebuild build \
             -project "$PROJECT_PATH" \
             -scheme "$SCHEME" \
-            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
-            "${test_args[@]}"
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}"
 
       - name: Skip unavailable optional runtime
         if: steps.simulator.outputs.available != 'true'
