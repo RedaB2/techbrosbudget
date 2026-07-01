@@ -54,10 +54,12 @@ jobs:
         include:
           - ios-version: "26.5"
             simulator-name: "iPhone 17 Pro Max"
+            device-type: "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max"
             test-scope: unit
             optional-runtime: false
           - ios-version: "27.0"
             simulator-name: "iPhone 17 Pro Max"
+            device-type: "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max"
             test-scope: unit
             optional-runtime: true
     steps:
@@ -69,21 +71,21 @@ jobs:
           xcodebuild -version
           xcodebuild -showsdks
 
-      - name: Check simulator destination
-        id: runtime
+      - name: Create simulator
+        id: simulator
         env:
           IOS_RUNTIME_VERSION: ${{ matrix.ios-version }}
           IOS_SIMULATOR_NAME: ${{ matrix.simulator-name }}
+          IOS_DEVICE_TYPE: ${{ matrix.device-type }}
           OPTIONAL_RUNTIME: ${{ matrix.optional-runtime }}
         run: |
-          destinations="$(
-            xcodebuild -project "$PROJECT_PATH" -scheme "$SCHEME" -showdestinations
-          )"
-          echo "$destinations"
+          runtime_id="com.apple.CoreSimulator.SimRuntime.iOS-${IOS_RUNTIME_VERSION//./-}"
 
-          if grep -F "OS:${IOS_RUNTIME_VERSION}, name:${IOS_SIMULATOR_NAME}" <<< "$destinations" >/dev/null; then
-            echo "Found ${IOS_SIMULATOR_NAME} on iOS ${IOS_RUNTIME_VERSION}."
+          if xcrun simctl list runtimes available | grep -F "$runtime_id" >/dev/null; then
+            device_id="$(xcrun simctl create "CI ${IOS_SIMULATOR_NAME} ${IOS_RUNTIME_VERSION}" "$IOS_DEVICE_TYPE" "$runtime_id")"
+            echo "Created ${IOS_SIMULATOR_NAME} on iOS ${IOS_RUNTIME_VERSION}: ${device_id}"
             echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "id=${device_id}" >> "$GITHUB_OUTPUT"
           elif [[ "$OPTIONAL_RUNTIME" == "true" ]]; then
             echo "::warning::${IOS_SIMULATOR_NAME} on iOS ${IOS_RUNTIME_VERSION} is not available on this hosted runner. Skipping optional ${IOS_RUNTIME_VERSION} test lane."
             echo "available=false" >> "$GITHUB_OUTPUT"
@@ -93,11 +95,9 @@ jobs:
           fi
 
       - name: Run tests
-        if: steps.runtime.outputs.available == 'true'
+        if: steps.simulator.outputs.available == 'true'
         env:
           TEST_SCOPE: ${{ matrix.test-scope }}
-          IOS_RUNTIME_VERSION: ${{ matrix.ios-version }}
-          IOS_SIMULATOR_NAME: ${{ matrix.simulator-name }}
         run: |
           test_args=()
           if [[ "$TEST_SCOPE" == "unit" ]]; then
@@ -107,11 +107,11 @@ jobs:
           xcodebuild test \
             -project "$PROJECT_PATH" \
             -scheme "$SCHEME" \
-            -destination "platform=iOS Simulator,OS=${IOS_RUNTIME_VERSION},name=${IOS_SIMULATOR_NAME}" \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             "${test_args[@]}"
 
       - name: Skip unavailable optional runtime
-        if: steps.runtime.outputs.available != 'true'
+        if: steps.simulator.outputs.available != 'true'
         run: |
           echo "Skipped iOS ${{ matrix.ios-version }} because this hosted runner does not provide that simulator runtime."
 
