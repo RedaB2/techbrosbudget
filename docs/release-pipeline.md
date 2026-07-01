@@ -8,10 +8,11 @@ This repo uses the conventional iOS release split:
 - `v*` tags: publish an App Store build and submit it for review.
 - Manual dispatch: run the external TestFlight or App Store lane with an explicit version.
 
-CI runs the full test suite against an iOS `26.5` simulator and the app/unit-test
-path against an iOS `27.0` simulator. The app and widget deployment target stays
-at `26.5`, so one TestFlight binary supports iOS 26.5 and newer while still
-being tested on the iOS 27 runtime.
+CI runs the full test suite against an iOS `26.5` simulator. It also runs the
+app/unit-test path against an iOS `27.0` simulator when that runtime is available
+on the runner; hosted GitHub runners may temporarily skip this optional lane
+until Apple/GitHub publish the runtime. The app and widget deployment target
+stays at `26.5`, so one TestFlight binary supports iOS 26.5 and newer.
 
 ## Versioning
 

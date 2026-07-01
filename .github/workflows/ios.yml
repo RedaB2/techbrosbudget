@@ -54,8 +54,10 @@ jobs:
         include:
           - ios-version: "26.5"
             test-scope: full
+            optional-runtime: false
           - ios-version: "27.0"
             test-scope: unit
+            optional-runtime: true
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -66,17 +68,28 @@ jobs:
           xcodebuild -showsdks
 
       - name: Ensure iOS simulator runtime
+        id: runtime
         env:
           IOS_RUNTIME_VERSION: ${{ matrix.ios-version }}
+          OPTIONAL_RUNTIME: ${{ matrix.optional-runtime }}
         run: |
           if xcrun simctl list runtimes available | grep -F "iOS ${IOS_RUNTIME_VERSION} " >/dev/null; then
             echo "iOS ${IOS_RUNTIME_VERSION} simulator runtime is already installed."
+            echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            xcodebuild -downloadPlatform iOS -buildVersion "$IOS_RUNTIME_VERSION"
+            if xcodebuild -downloadPlatform iOS -buildVersion "$IOS_RUNTIME_VERSION"; then
+              echo "available=true" >> "$GITHUB_OUTPUT"
+            elif [[ "$OPTIONAL_RUNTIME" == "true" ]]; then
+              echo "::warning::iOS ${IOS_RUNTIME_VERSION} is not available on this hosted runner. Skipping optional ${IOS_RUNTIME_VERSION} test lane."
+              echo "available=false" >> "$GITHUB_OUTPUT"
+            else
+              exit 1
+            fi
           fi
 
       - name: Select simulator
         id: simulator
+        if: steps.runtime.outputs.available == 'true'
         env:
           IOS_RUNTIME_VERSION: ${{ matrix.ios-version }}
         run: |
@@ -84,6 +97,7 @@ jobs:
           echo "id=${SIMULATOR_ID}" >> "$GITHUB_OUTPUT"
 
       - name: Run tests
+        if: steps.runtime.outputs.available == 'true'
         env:
           TEST_SCOPE: ${{ matrix.test-scope }}
         run: |
@@ -97,6 +111,11 @@ jobs:
             -scheme "$SCHEME" \
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             "${test_args[@]}"
+
+      - name: Skip unavailable optional runtime
+        if: steps.runtime.outputs.available != 'true'
+        run: |
+          echo "Skipped iOS ${{ matrix.ios-version }} because this hosted runner does not provide that simulator runtime."
 
   external-testflight:
     name: External TestFlight
