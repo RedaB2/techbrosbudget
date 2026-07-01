@@ -122,13 +122,13 @@
         }
       }
     },
-    "Records an expense in Tech Bros Budget from Siri or Shortcuts." : {
+    "Records an expense in Tech Bros Budget from voice commands or Shortcuts." : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Records an expense in Tech Bros Budget from Siri or Shortcuts."
+            "value" : "Records an expense in Tech Bros Budget from voice commands or Shortcuts."
           }
         }
       }

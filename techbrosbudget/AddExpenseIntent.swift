@@ -13,7 +13,7 @@ struct AddExpenseIntent: AppIntent {
 
     static var description: IntentDescription? {
         IntentDescription(
-            "Records an expense in Tech Bros Budget from Siri or Shortcuts.",
+            "Records an expense in Tech Bros Budget from voice commands or Shortcuts.",
             searchKeywords: ["spending", "budget", "transaction"]
         )
     }
@@ -48,7 +48,7 @@ struct AddExpenseIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard let decimalAmount = SiriExpenseInput.decimalAmount(from: amount) else {
+        guard let decimalAmount = SpokenExpenseInput.decimalAmount(from: amount) else {
             throw AddExpenseIntentError.invalidAmount
         }
 
@@ -64,7 +64,7 @@ struct RecordSpokenExpenseIntent: AppIntent {
     static var description: IntentDescription? {
         IntentDescription(
             "Records a dictated expense such as '74 on coffee' in Tech Bros Budget.",
-            searchKeywords: ["spending", "budget", "transaction", "Siri"]
+            searchKeywords: ["spending", "budget", "transaction"]
         )
     }
 
@@ -89,7 +89,7 @@ struct RecordSpokenExpenseIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard let parsedExpense = SiriExpenseInput.parsedExpense(from: spokenExpense.text) else {
+        guard let parsedExpense = SpokenExpenseInput.parsedExpense(from: spokenExpense.text) else {
             throw AddExpenseIntentError.invalidSpokenExpense
         }
 
@@ -152,12 +152,12 @@ struct SpokenExpenseQuery: EntityStringQuery {
     }
 }
 
-struct ParsedSiriExpense: Equatable {
+struct ParsedSpokenExpense: Equatable {
     let amount: Decimal
     let note: String
 }
 
-enum SiriExpenseInput {
+enum SpokenExpenseInput {
     nonisolated static func decimalAmount(from amount: Double) -> Decimal? {
         guard amount.isFinite else {
             return nil
@@ -171,7 +171,7 @@ enum SiriExpenseInput {
         return Decimal(Int64(cents)) / Decimal(100)
     }
 
-    nonisolated static func parsedExpense(from spokenExpense: String) -> ParsedSiriExpense? {
+    nonisolated static func parsedExpense(from spokenExpense: String) -> ParsedSpokenExpense? {
         let trimmed = strippedSpendingPrefix(from: spokenExpense)
         guard !trimmed.isEmpty else {
             return nil
@@ -193,7 +193,7 @@ enum SiriExpenseInput {
 
         let remainder = String(trimmed[scanner.currentIndex...])
         let note = normalizedNote(strippedConnectorPrefix(from: remainder))
-        return ParsedSiriExpense(amount: amount, note: note)
+        return ParsedSpokenExpense(amount: amount, note: note)
     }
 
     nonisolated static func normalizedNote(_ note: String) -> String {
@@ -250,7 +250,7 @@ enum SiriExpenseInput {
 
 private enum ExpenseIntentRecorder {
     static func record(amount: Decimal, note: String) async -> (formattedAmount: String, note: String) {
-        let normalizedNote = SiriExpenseInput.normalizedNote(note)
+        let normalizedNote = SpokenExpenseInput.normalizedNote(note)
 
         let formattedAmount = await MainActor.run {
             _ = BudgetStore().addExpense(amount: amount, note: normalizedNote)
