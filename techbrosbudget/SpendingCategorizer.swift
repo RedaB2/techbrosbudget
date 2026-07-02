@@ -7,12 +7,23 @@
 
 import Foundation
 import FoundationModels
+import os
 
 protocol SpendingCategorizing {
     func categorize(description: String, amount: Decimal) async throws -> SpendingCategory
 }
 
 struct AppleIntelligenceSpendingCategorizer: SpendingCategorizing {
+    static let allowedCategoryNames = SpendingCategory.allCases.map(\.apiName)
+
+    private static let logger = Logger(subsystem: "reda.techbrosbudget", category: "SpendingCategorizer")
+
+    // On some iOS 26 builds the system safety classifier fails to load and
+    // every generation request throws even though the language model works
+    // (see FoundationModelsFailure). Once detected, later expenses skip the
+    // doomed standard attempt and go straight to relaxed guardrails.
+    private static let safetyModelIsBroken = OSAllocatedUnfairLock(initialState: false)
+
     private let model: SystemLanguageModel
     private let fallbackCategorizer: LocalHeuristicSpendingCategorizer
 
@@ -26,25 +37,69 @@ struct AppleIntelligenceSpendingCategorizer: SpendingCategorizing {
             return try await fallbackCategorizer.categorize(description: description, amount: amount)
         }
 
+        if !Self.safetyModelIsBroken.withLock({ $0 }) {
+            do {
+                if let category = try await modelCategory(using: model, description: description, amount: amount) {
+                    return category
+                }
+                return try await fallbackCategorizer.categorize(description: description, amount: amount)
+            } catch where FoundationModelsFailure.isSafetyModelFailure(error) {
+                Self.logger.error("Safety classifier failed; retrying with relaxed guardrails: \(error, privacy: .public)")
+                Self.safetyModelIsBroken.withLock { $0 = true }
+            }
+        }
+
+        do {
+            let relaxedModel = SystemLanguageModel(guardrails: .permissiveContentTransformations)
+            if let category = try await modelCategory(using: relaxedModel, description: description, amount: amount) {
+                return category
+            }
+        } catch {
+            Self.logger.error("Relaxed-guardrails categorization failed: \(error, privacy: .public)")
+        }
+
+        return try await fallbackCategorizer.categorize(description: description, amount: amount)
+    }
+
+    static let categorizationInstructions = """
+    Categorize one personal expense into exactly one of these budget categories:
+    \(allowedCategoryNames.joined(separator: ", "))
+
+    Rules:
+    - The description is often just a merchant or brand name. Infer what that merchant sells.
+    - Use the amount as context. The same merchant can mean different purchases at different prices: a very large amount at a car brand is a vehicle purchase, not office spending.
+    - Vehicle purchases, fuel, EV charging, parking, and rideshares are Transport.
+    - Prefer the most specific category. Use Misc / Awkward only when nothing fits.
+    - Respond with only the category label, nothing else.
+
+    Examples (Amount | Description -> Category):
+    6.50 | Blue Bottle -> Food & Drink
+    84.12 | Whole Foods -> Groceries
+    45 | Shell -> Transport
+    12000 | Tesla -> Transport
+    15.49 | Netflix -> Subscriptions
+    480 | Delta flight to NYC -> Travel
+    1199 | new MacBook -> Shopping
+    49 | Coursera course -> Work & Education
+    2400 | rent -> Housing
+    """
+
+    private func modelCategory(using model: SystemLanguageModel, description: String, amount: Decimal) async throws -> SpendingCategory? {
         let session = LanguageModelSession(
             model: model,
-            instructions: """
-            Categorize one personal expense into exactly one of the allowed budget categories.
-            Prefer the most specific category. Use Misc / Awkward only when no category fits.
-            """
+            instructions: Self.categorizationInstructions
         )
 
         let response = try await session.respond(
             to: """
             Amount: \(NSDecimalNumber(decimal: amount).stringValue)
             Description: \(description)
-            Allowed categories: \(ExpenseCategoryResult.allowedCategories.joined(separator: ", "))
+            Return only the single best category label.
             """,
-            generating: ExpenseCategoryResult.self,
             options: GenerationOptions(temperature: 0.1)
         )
 
-        return SpendingCategory.category(matching: response.content.category) ?? .awkward
+        return Self.category(from: response.content)
     }
 
     static func availabilitySummary() -> AppleIntelligenceAvailabilitySummary {
@@ -88,15 +143,43 @@ struct AppleIntelligenceSpendingCategorizer: SpendingCategorizing {
         }
     }
 
-    @Generable
-    struct ExpenseCategoryResult {
-        static let allowedCategories = SpendingCategory.allCases.map(\.apiName)
+    static func category(from modelOutput: String) -> SpendingCategory? {
+        let trimmed = modelOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let exact = SpendingCategory.category(matching: strippedCategoryDecorations(from: trimmed)) {
+            return exact
+        }
 
-        @Guide(description: "The best matching budget category.", .anyOf(Self.allowedCategories))
-        var category: String
+        let lineCandidates = trimmed
+            .components(separatedBy: .newlines)
+            .flatMap { line -> [String] in
+                let parts = line.components(separatedBy: ":")
+                return [line] + parts
+            }
 
-        @Guide(description: "Confidence from 0.0 to 1.0.", .range(0.0...1.0))
-        var confidence: Double
+        for candidate in lineCandidates {
+            if let category = SpendingCategory.category(matching: strippedCategoryDecorations(from: candidate)) {
+                return category
+            }
+        }
+
+        let normalizedOutput = normalizedCategorySearchText(trimmed)
+        return SpendingCategory.allCases.first { category in
+            normalizedOutput.contains(normalizedCategorySearchText(category.apiName))
+        }
+    }
+
+    private static func strippedCategoryDecorations(from text: String) -> String {
+        text.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\"'`.,;")))
+    }
+
+    private static func normalizedCategorySearchText(_ text: String) -> String {
+        text
+            .lowercased()
+            .replacingOccurrences(of: "&", with: "and")
+            .replacingOccurrences(of: "/", with: " ")
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 }
 

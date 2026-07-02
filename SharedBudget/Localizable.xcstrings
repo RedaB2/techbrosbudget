@@ -1,6 +1,31 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "/" : {
+
+    },
+    "%@" : {
+
+    },
+    "%lld" : {
+
+    },
+    "%lld %@ in this window" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld %2$@ in this window"
+          }
+        }
+      }
+    },
+    "0.00" : {
+
+    },
+    "Add" : {
+
+    },
     "Add ${amount} spent on ${note}" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -12,6 +37,9 @@
         }
       }
     },
+    "Add expense" : {
+
+    },
     "Add Expense" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19,6 +47,19 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Add Expense"
+          }
+        }
+      }
+    },
+    "Add spending" : {
+
+    },
+    "Added %@ for %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Added %1$@ for %2$@."
           }
         }
       }
@@ -33,6 +74,44 @@
           }
         }
       }
+    },
+    "Appearance" : {
+
+    },
+    "Apple Intelligence" : {
+
+    },
+    "Apple Intelligence isn't enabled. Head to Settings → Apple Intelligence & Siri to turn it on." : {
+
+    },
+    "budget" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "budget"
+          }
+        }
+      }
+    },
+    "Budget Amount" : {
+
+    },
+    "Budget Overview" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Categories" : {
+
+    },
+    "Categorization pending" : {
+
+    },
+    "Category summary" : {
+
     },
     "Choose Amount" : {
       "extractionState" : "manual",
@@ -56,6 +135,15 @@
         }
       }
     },
+    "Close" : {
+
+    },
+    "Coffee, team lunch, taxi to the office" : {
+
+    },
+    "Continue" : {
+
+    },
     "Daily" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -66,6 +154,15 @@
           }
         }
       }
+    },
+    "Delete expense" : {
+
+    },
+    "Description" : {
+
+    },
+    "Done" : {
+
     },
     "Expense" : {
       "extractionState" : "manual",
@@ -78,6 +175,30 @@
         }
       }
     },
+    "Expense categorization uses Apple's Foundation Models on device. No API key is stored, and no expense description is sent to an external AI server." : {
+
+    },
+    "Expenses and window preferences sync through your private CloudKit database when iCloud is available." : {
+
+    },
+    "How much did you spend?" : {
+
+    },
+    "Listening…" : {
+
+    },
+    "Makes it rain dollars" : {
+
+    },
+    "Message Tech Bro…" : {
+
+    },
+    "Month" : {
+
+    },
+    "Month window" : {
+
+    },
     "Monthly" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -88,6 +209,30 @@
           }
         }
       }
+    },
+    "Not Available" : {
+
+    },
+    "Note" : {
+
+    },
+    "Pick monthly, weekly, or daily spending for the smallest widget." : {
+
+    },
+    "Private by design: your data stays in your personal iCloud." : {
+
+    },
+    "Private iCloud sync" : {
+
+    },
+    "Pull to chat" : {
+
+    },
+    "Pull up to open Budget Chat" : {
+
+    },
+    "Recent" : {
+
     },
     "Record ${spokenExpense}" : {
       "extractionState" : "manual",
@@ -111,6 +256,9 @@
         }
       }
     },
+    "Record voice message" : {
+
+    },
     "Records a dictated expense such as '74 on coffee' in Tech Bros Budget." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -132,6 +280,44 @@
           }
         }
       }
+    },
+    "See monthly, weekly, and daily spending together." : {
+
+    },
+    "Send message" : {
+
+    },
+    "Settings" : {
+
+    },
+    "spending" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "spending"
+          }
+        }
+      }
+    },
+    "Spending" : {
+
+    },
+    "Stop recording" : {
+
+    },
+    "Suggested categories" : {
+
+    },
+    "System matches your device's light or dark mode setting." : {
+
+    },
+    "Tech Bro" : {
+
+    },
+    "Tech Bros logo" : {
+
     },
     "The amount and what it was for, such as '74 on coffee'." : {
       "extractionState" : "manual",
@@ -155,6 +341,39 @@
         }
       }
     },
+    "Theme" : {
+
+    },
+    "Totals update immediately. Category cleanup runs after this screen closes." : {
+
+    },
+    "transaction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "transaction"
+          }
+        }
+      }
+    },
+    "vs %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "vs %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "Week" : {
+
+    },
+    "Week window" : {
+
+    },
     "Weekly" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -165,6 +384,9 @@
           }
         }
       }
+    },
+    "What did you spend?" : {
+
     },
     "What the money was spent on." : {
       "extractionState" : "manual",
@@ -177,38 +399,11 @@
         }
       }
     },
-    "budget" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "budget"
-          }
-        }
-      }
+    "What was it for?" : {
+
     },
-    "spending" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "spending"
-          }
-        }
-      }
-    },
-    "transaction" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "transaction"
-          }
-        }
-      }
+    "Windows" : {
+
     }
   },
   "version" : "1.1"

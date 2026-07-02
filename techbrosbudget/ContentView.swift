@@ -7,11 +7,22 @@
 
 import SwiftUI
 
+private func opensBudgetChatForUITests() -> Bool {
+    #if DEBUG
+    ProcessInfo.processInfo.arguments.contains("UITEST_MARKDOWN_CHAT")
+    #else
+    false
+    #endif
+}
+
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store: BudgetStore
     @State private var isAddingExpense = false
     @State private var isShowingSettings = false
+    @State private var isShowingChat = opensBudgetChatForUITests()
+    @State private var bottomOverscroll: CGFloat = 0
+    @StateObject private var moneyRain = MoneyRainSimulator()
 
     @MainActor
     init(store: BudgetStore? = nil) {
@@ -20,15 +31,18 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .bottomTrailing) {
                 BudgetBackground()
 
                 ScrollView {
                     GlassEffectContainer(spacing: 18) {
                         VStack(alignment: .leading, spacing: 18) {
-                            HeaderView {
-                                isShowingSettings = true
-                            }
+                            HeaderView(
+                                onSettings: { isShowingSettings = true },
+                                onLogoTap: { logoCenter in
+                                    moneyRain.burst(from: logoCenter)
+                                }
+                            )
 
                             TotalsStack(store: store)
 
@@ -37,20 +51,37 @@ struct ContentView: View {
                             CategoryBreakdown(store: store)
 
                             RecentExpensesView(store: store)
+
+                            ChatPullAffordance(overscroll: bottomOverscroll)
                         }
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 18)
                     .padding(.bottom, 110)
                 }
+                .onScrollGeometryChange(for: CGFloat.self) { geo in
+                    max(0, geo.contentOffset.y + geo.containerSize.height - geo.contentSize.height)
+                } action: { _, overscroll in
+                    bottomOverscroll = overscroll
+                    if overscroll > 80 && !isShowingChat {
+                        isShowingChat = true
+                    }
+                }
+
+                Button(action: { isAddingExpense = true }) {
+                    Image(systemName: "plus")
+                        .font(.title2.weight(.bold))
+                        .frame(width: 60, height: 60)
+                }
+                .buttonStyle(.glassProminent)
+                .accessibilityLabel("Add expense")
+                .padding(.trailing, 20)
+                .padding(.bottom, 20)
+
+                MoneyRainOverlay(simulator: moneyRain)
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .bottom) {
-                AddExpenseBar {
-                    isAddingExpense = true
-                }
-            }
             .sheet(isPresented: $isAddingExpense) {
                 AddExpenseView(store: store)
                     .presentationDetents([.medium, .large])
@@ -59,6 +90,11 @@ struct ContentView: View {
             .sheet(isPresented: $isShowingSettings) {
                 SettingsView()
                     .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $isShowingChat) {
+                BudgetChatView(store: store)
+                    .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
             .navigationDestination(for: BudgetPeriod.self) { period in
@@ -78,20 +114,52 @@ struct ContentView: View {
 
 private struct HeaderView: View {
     let onSettings: () -> Void
+    let onLogoTap: (CGPoint) -> Void
+
+    @State private var jiggleCount = 0
+    @State private var logoCenter: CGPoint = .zero
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 10) {
-                Image("BrandLogoForeground")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 76, height: 76, alignment: .leading)
-                    .accessibilityLabel("Tech Bros logo")
+                Button {
+                    jiggleCount += 1
+                    onLogoTap(logoCenter)
+                } label: {
+                    Image("BrandLogoForeground")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 76, height: 76, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .keyframeAnimator(initialValue: LogoJiggle(), trigger: jiggleCount) { view, jiggle in
+                    view
+                        .rotationEffect(.degrees(jiggle.angle))
+                        .scaleEffect(jiggle.scale)
+                } keyframes: { _ in
+                    KeyframeTrack(\.angle) {
+                        CubicKeyframe(-13, duration: 0.09)
+                        CubicKeyframe(11, duration: 0.11)
+                        CubicKeyframe(-7, duration: 0.11)
+                        CubicKeyframe(4, duration: 0.11)
+                        CubicKeyframe(0, duration: 0.13)
+                    }
 
-                Text("Fast manual expense logging with async category cleanup.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                    KeyframeTrack(\.scale) {
+                        CubicKeyframe(1.12, duration: 0.12)
+                        CubicKeyframe(0.97, duration: 0.18)
+                        CubicKeyframe(1.0, duration: 0.25)
+                    }
+                }
+                .sensoryFeedback(.impact(weight: .light), trigger: jiggleCount)
+                .onGeometryChange(for: CGPoint.self) { proxy in
+                    let frame = proxy.frame(in: .global)
+                    return CGPoint(x: frame.midX, y: frame.midY)
+                } action: { center in
+                    logoCenter = center
+                }
+                .accessibilityLabel("Tech Bros logo")
+                .accessibilityHint("Makes it rain dollars")
             }
 
             Spacer()
@@ -105,6 +173,11 @@ private struct HeaderView: View {
             .accessibilityLabel("Settings")
         }
     }
+}
+
+private struct LogoJiggle {
+    var angle: Double = 0
+    var scale: Double = 1
 }
 
 private struct TotalsStack: View {
@@ -689,61 +762,34 @@ private struct ExpenseRow: View {
     }
 }
 
-private struct AddExpenseBar: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.colorScheme) private var colorScheme
-
-    let onAdd: () -> Void
-
-    var body: some View {
-        HStack {
-            Spacer()
-
-            Button(action: onAdd) {
-                HStack(spacing: 10) {
-                    Image(systemName: "plus")
-                    Image(systemName: "arrow.up.right")
-                }
-                .font(.headline.weight(.bold))
-                .frame(height: 54)
-                .padding(.horizontal, 24)
-            }
-            .buttonStyle(.glassProminent)
-            .accessibilityLabel("Add expense")
-
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .background {
-            ZStack {
-                if reduceTransparency {
-                    Color(.systemBackground)
-                } else {
-                    Rectangle()
-                        .fill(.bar)
-                    Color(.systemBackground)
-                        .opacity(colorScheme == .dark ? 0.22 : 0.12)
-                }
-            }
-            .ignoresSafeArea(edges: .bottom)
-        }
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Color(.separator).opacity(colorScheme == .dark ? 0.28 : 0.18))
-                .frame(height: 0.5)
-        }
-    }
-}
-
 private struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(AppearanceSetting.storageKey) private var appearanceRawValue = AppearanceSetting.system.rawValue
     @State private var intelligenceSummary = AppleIntelligenceSpendingCategorizer.availabilitySummary()
+
+    private var appearanceSetting: AppearanceSetting {
+        AppearanceSetting(rawValue: appearanceRawValue) ?? .system
+    }
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Picker(selection: $appearanceRawValue) {
+                        ForEach(AppearanceSetting.allCases) { setting in
+                            Text(setting.title)
+                                .tag(setting.rawValue)
+                        }
+                    } label: {
+                        Label("Theme", systemImage: "circle.lefthalf.filled")
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Appearance")
+                } footer: {
+                    Text("System matches your device's light or dark mode setting.")
+                }
+
                 Section {
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
@@ -925,6 +971,33 @@ private struct EmptyStateRow: View {
     }
 }
 
+private struct ChatPullAffordance: View {
+    let overscroll: CGFloat
+
+    private var progress: CGFloat {
+        min(max(0, overscroll) / 80, 1.0)
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "bubble.left.and.bubble.right.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(Color.teal.opacity(0.4 + progress * 0.6))
+                .scaleEffect(0.72 + progress * 0.38)
+                .offset(y: -progress * 6)
+
+            Text("Pull to chat")
+                .font(.caption)
+                .foregroundStyle(.secondary.opacity(0.45 + progress * 0.55))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 4)
+        .padding(.bottom, 10)
+        .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: overscroll)
+        .accessibilityLabel("Pull up to open Budget Chat")
+    }
+}
+
 private struct LiquidGlassCard<Content: View>: View {
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -986,7 +1059,7 @@ private struct LiquidGlassCard<Content: View>: View {
     }
 }
 
-private struct BudgetBackground: View {
+struct BudgetBackground: View {
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.colorScheme) private var colorScheme

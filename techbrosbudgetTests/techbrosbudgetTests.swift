@@ -53,6 +53,36 @@ struct techbrosbudgetTests {
         #expect(LocalHeuristicSpendingCategorizer.category(for: "mysterious gadget thing") == .awkward)
     }
 
+    @Test func appleIntelligenceCategoryParserAcceptsPlainTextLabels() {
+        #expect(AppleIntelligenceSpendingCategorizer.category(from: "Food & Drink") == .foodAndDrink)
+        #expect(AppleIntelligenceSpendingCategorizer.category(from: "Category: Work & Education.") == .workAndEducation)
+        #expect(AppleIntelligenceSpendingCategorizer.category(from: "`Misc / Awkward`") == .awkward)
+        #expect(AppleIntelligenceSpendingCategorizer.category(from: "This should be filed under Fees and Taxes.") == .feesAndTaxes)
+        #expect(AppleIntelligenceSpendingCategorizer.category(from: "No matching label") == nil)
+    }
+
+    @Test @MainActor func budgetChatInstructionsUseFriendlySpendingLanguage() {
+        let instructions = BudgetChatSession.instructions(for: .preview)
+
+        #expect(instructions.contains("casual, friendly budget coach"))
+        #expect(instructions.contains("amounts already spent"))
+        #expect(instructions.contains("not budget limits or target budgets"))
+        #expect(instructions.contains("Spent today"))
+        #expect(instructions.contains("Spent this week"))
+        #expect(instructions.contains("Spent this month"))
+        #expect(instructions.contains("Do not use em dashes"))
+        #expect(!instructions.contains("occasionally drop casual bro-speak"))
+        #expect(!instructions.contains(" — "))
+    }
+
+    @Test func budgetChatMarkdownStripsInlineMarkersForRenderedText() {
+        let attributed = BudgetChatMarkdown.attributedString(
+            from: "Markdown check: **bold spending**, *friendly tone*, and `daily spent`."
+        )
+
+        #expect(String(attributed.characters) == "Markdown check: bold spending, friendly tone, and daily spent.")
+    }
+
     @Test func filteredTransactionsFollowSelectedWindowMode() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

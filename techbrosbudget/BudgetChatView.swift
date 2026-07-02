@@ -42,22 +42,20 @@ struct BudgetChatView: View {
         HStack(spacing: 12) {
             TechBroAvatar(size: 40)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Tech Bro")
-                    .font(.headline)
-                Text("Your budget advisor")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text("Tech Bro")
+                .font(.headline)
 
             Spacer()
 
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.subheadline.weight(.semibold))
-                    .frame(width: kInputHeight, height: kInputHeight)
+                    .foregroundStyle(.primary)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Circle())
             }
-            .buttonStyle(.glass)
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: .circle)
             .accessibilityLabel("Close")
         }
         .padding(.horizontal, 20)
@@ -109,33 +107,67 @@ struct BudgetChatView: View {
         }
     }
 
+    @ViewBuilder
     private var welcomeBubble: some View {
-        HStack(alignment: .top, spacing: 10) {
-            TechBroAvatar(size: 30)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(session.isModelAvailable ? "Yo! I'm Tech Bro 👋" : "Not Available")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(session.isModelAvailable ? Color.primary : Color.orange)
-
-                Text(
-                    session.isModelAvailable
-                    ? "What's your budget situation looking like? Ask me anything — biggest spends, where to cut costs, category breakdowns, whatever you need."
-                    : "Apple Intelligence isn't enabled. Head to Settings → Apple Intelligence & Siri to turn it on."
+        if session.isModelAvailable {
+            VStack(alignment: .leading, spacing: 14) {
+                AssistantBubble(
+                    content: "What's your budget situation looking like? Ask me anything: biggest spends, where to cut costs, category breakdowns, whatever you need.",
+                    isStreaming: false
                 )
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                suggestionChips
             }
+        } else {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Not Available")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.orange)
 
-            Spacer(minLength: 40)
-        }
-        .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                    Text("Apple Intelligence isn't enabled. Head to Settings → Apple Intelligence & Siri to turn it on.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 40)
+            }
+            .padding(14)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+            }
         }
     }
+
+    private var suggestionChips: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Self.suggestions, id: \.self) { prompt in
+                Button {
+                    Task { await session.send(prompt) }
+                } label: {
+                    Text(prompt)
+                        .font(.subheadline)
+                        .foregroundStyle(.teal)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(Color.teal.opacity(0.1), in: Capsule())
+                        .overlay {
+                            Capsule().strokeBorder(Color.teal.opacity(0.35), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .disabled(session.isResponding)
+            }
+        }
+        .padding(.leading, 4)
+    }
+
+    private static let suggestions = [
+        "What are my biggest spends?",
+        "Where can I cut costs?",
+        "Break down my spending by category",
+    ]
 
     // MARK: - Input row
     //
@@ -164,8 +196,10 @@ struct BudgetChatView: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(session.isRecording ? .red : .primary)
                 .frame(width: kInputHeight, height: kInputHeight)
+                .contentShape(Circle())
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: .circle)
         .symbolEffect(.pulse, isActive: session.isRecording)
         .accessibilityLabel(session.isRecording ? "Stop recording" : "Record voice message")
     }
@@ -206,9 +240,12 @@ struct BudgetChatView: View {
         } label: {
             Image(systemName: "arrow.up")
                 .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(.white)
                 .frame(width: kInputHeight, height: kInputHeight)
+                .contentShape(Circle())
         }
-        .buttonStyle(.glassProminent)
+        .buttonStyle(.plain)
+        .glassEffect(.regular.tint(.teal).interactive(), in: .circle)
         .opacity(canSend ? 1 : 0.45)
         .disabled(!canSend)
         .accessibilityLabel("Send message")
@@ -244,10 +281,8 @@ private struct AssistantBubble: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            TechBroAvatar(size: 28)
-
             VStack(alignment: .leading, spacing: 4) {
-                Text(content)
+                Text(BudgetChatMarkdown.attributedString(from: content))
                     .font(.subheadline)
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 14)
@@ -291,8 +326,6 @@ private struct TypingBubble: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            TechBroAvatar(size: 28)
-
             HStack(spacing: 5) {
                 ForEach(0..<3, id: \.self) { i in
                     Circle()
@@ -323,7 +356,7 @@ private struct TechBroAvatar: View {
     let size: CGFloat
 
     var body: some View {
-        Image("BrandLogoForeground")
+        Image("TechBroFace")
             .resizable()
             .scaledToFit()
             .padding(size * 0.1)
