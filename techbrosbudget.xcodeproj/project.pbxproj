@@ -506,7 +506,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Tech Bros Budget";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Tech Bros Budget uses the microphone so you can dictate expenses and talk to the budget assistant.";
 				INFOPLIST_KEY_NSSiriUsageDescription = "Tech Bros Budget uses voice commands to record expenses you dictate.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Tech Bros Budget transcribes your voice so spoken expenses and questions become text.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -543,7 +545,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Tech Bros Budget";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Tech Bros Budget uses the microphone so you can dictate expenses and talk to the budget assistant.";
 				INFOPLIST_KEY_NSSiriUsageDescription = "Tech Bros Budget uses voice commands to record expenses you dictate.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Tech Bros Budget transcribes your voice so spoken expenses and questions become text.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
