@@ -183,6 +183,50 @@ enum CategorizationState: String, Codable {
     case needsReview
 }
 
+enum RecurrenceFrequency: String, CaseIterable, Codable, Identifiable {
+    case weekly
+    case monthly
+    case yearly
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .weekly:
+            return "Weekly"
+        case .monthly:
+            return "Monthly"
+        case .yearly:
+            return "Yearly"
+        }
+    }
+
+    var intervalNoun: String {
+        switch self {
+        case .weekly:
+            return "week"
+        case .monthly:
+            return "month"
+        case .yearly:
+            return "year"
+        }
+    }
+
+    func nextDate(after date: Date, calendar: Calendar = .current) -> Date {
+        let components: DateComponents
+        switch self {
+        case .weekly:
+            components = DateComponents(weekOfYear: 1)
+        case .monthly:
+            components = DateComponents(month: 1)
+        case .yearly:
+            components = DateComponents(year: 1)
+        }
+
+        return calendar.date(byAdding: components, to: date) ?? date.addingTimeInterval(7 * 86_400)
+    }
+}
+
 struct SpendingComparison: Equatable {
     let currentTotal: Decimal
     let previousTotal: Decimal
@@ -205,6 +249,9 @@ struct Expense: Identifiable, Codable, Equatable {
     var date: Date
     var category: SpendingCategory
     var categorizationState: CategorizationState
+    var recurrence: RecurrenceFrequency?
+    var nextOccurrenceDate: Date?
+    var recurringSourceID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -212,7 +259,10 @@ struct Expense: Identifiable, Codable, Equatable {
         note: String,
         date: Date = Date(),
         category: SpendingCategory = .awkward,
-        categorizationState: CategorizationState = .pending
+        categorizationState: CategorizationState = .pending,
+        recurrence: RecurrenceFrequency? = nil,
+        nextOccurrenceDate: Date? = nil,
+        recurringSourceID: UUID? = nil
     ) {
         self.id = id
         self.amount = amount
@@ -220,6 +270,13 @@ struct Expense: Identifiable, Codable, Equatable {
         self.date = date
         self.category = category
         self.categorizationState = categorizationState
+        self.recurrence = recurrence
+        self.nextOccurrenceDate = nextOccurrenceDate
+        self.recurringSourceID = recurringSourceID
+    }
+
+    var isRecurring: Bool {
+        recurrence != nil || recurringSourceID != nil
     }
 }
 

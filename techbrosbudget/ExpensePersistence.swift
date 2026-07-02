@@ -38,6 +38,9 @@ final class PersistedExpense {
     var date: Date = Date()
     var category: String = SpendingCategory.awkward.rawValue
     var categorizationState: String = CategorizationState.pending.rawValue
+    var recurrence: String?
+    var nextOccurrenceDate: Date?
+    var recurringSourceID: UUID?
 
     init(expense: Expense) {
         self.id = expense.id
@@ -46,6 +49,9 @@ final class PersistedExpense {
         self.date = expense.date
         self.category = expense.category.rawValue
         self.categorizationState = expense.categorizationState.rawValue
+        self.recurrence = expense.recurrence?.rawValue
+        self.nextOccurrenceDate = expense.nextOccurrenceDate
+        self.recurringSourceID = expense.recurringSourceID
     }
 
     func update(from expense: Expense) {
@@ -54,6 +60,9 @@ final class PersistedExpense {
         date = expense.date
         category = expense.category.rawValue
         categorizationState = expense.categorizationState.rawValue
+        recurrence = expense.recurrence?.rawValue
+        nextOccurrenceDate = expense.nextOccurrenceDate
+        recurringSourceID = expense.recurringSourceID
     }
 
     var expense: Expense {
@@ -63,7 +72,10 @@ final class PersistedExpense {
             note: note,
             date: date,
             category: SpendingCategory(rawValue: category) ?? .awkward,
-            categorizationState: CategorizationState(rawValue: categorizationState) ?? .needsReview
+            categorizationState: CategorizationState(rawValue: categorizationState) ?? .needsReview,
+            recurrence: recurrence.flatMap(RecurrenceFrequency.init(rawValue:)),
+            nextOccurrenceDate: nextOccurrenceDate,
+            recurringSourceID: recurringSourceID
         )
     }
 }

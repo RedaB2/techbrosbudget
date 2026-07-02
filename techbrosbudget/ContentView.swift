@@ -732,6 +732,13 @@ private struct ExpenseRow: View {
 
                     Text(expense.date, format: .dateTime.month(.abbreviated).day().hour().minute())
 
+                    if expense.isRecurring {
+                        Image(systemName: "repeat")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.cyan)
+                            .accessibilityLabel("Recurring")
+                    }
+
                     if expense.categorizationState == .pending {
                         ProgressView()
                             .controlSize(.mini)
@@ -850,6 +857,8 @@ private struct AddExpenseView: View {
     @FocusState private var focusedField: Field?
     @State private var amountText = ""
     @State private var note = ""
+    @State private var isRecurring = false
+    @State private var recurrenceFrequency = RecurrenceFrequency.monthly
 
     private enum Field {
         case amount
@@ -885,30 +894,30 @@ private struct AddExpenseView: View {
                 } header: {
                     Text("Expense")
                 } footer: {
-                    Text("Totals update immediately. Category cleanup runs after this screen closes.")
+                    Text("Totals update immediately. The category is assigned automatically after this screen closes.")
                 }
 
-                Section("Suggested categories") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 10)], spacing: 10) {
-                        ForEach(SpendingCategory.allCases) { category in
-                            HStack(spacing: 7) {
-                                Image(systemName: category.symbol)
-                                    .foregroundStyle(category.readableTint)
-                                    .accessibilityHidden(true)
-
-                                Text(category.rawValue)
-                                    .foregroundStyle(.primary)
-                            }
-                            .font(.caption.weight(.semibold))
-                            .lineLimit(1)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(category.readableTint.opacity(0.12), in: Capsule())
-                            .accessibilityElement(children: .combine)
-                        }
+                Section {
+                    Toggle(isOn: $isRecurring.animation()) {
+                        Label("Recurring expense", systemImage: "repeat")
                     }
-                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+
+                    if isRecurring {
+                        Picker("Repeats", selection: $recurrenceFrequency) {
+                            ForEach(RecurrenceFrequency.allCases) { frequency in
+                                Text(frequency.title).tag(frequency)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                } header: {
+                    Text("Repeat")
+                } footer: {
+                    if isRecurring {
+                        Text("Great for subscriptions. Future charges are logged automatically every \(recurrenceFrequency.intervalNoun), starting \(recurrenceFrequency.nextDate(after: Date()), format: .dateTime.month(.abbreviated).day()).")
+                    } else {
+                        Text("Turn this on for subscriptions and other charges that repeat on a schedule.")
+                    }
                 }
             }
             .scrollContentBackground(.hidden)
@@ -940,7 +949,11 @@ private struct AddExpenseView: View {
             return
         }
 
-        store.addExpense(amount: parsedAmount, note: note.trimmingCharacters(in: .whitespacesAndNewlines))
+        store.addExpense(
+            amount: parsedAmount,
+            note: note.trimmingCharacters(in: .whitespacesAndNewlines),
+            recurrence: isRecurring ? recurrenceFrequency : nil
+        )
         dismiss()
     }
 }

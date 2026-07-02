@@ -35,6 +35,7 @@ final class BudgetStore: ObservableObject {
     private let categorizer: SpendingCategorizing
     private let calculator: BudgetCalculator
     private let persistence: BudgetPersisting
+    private let calendar: Calendar
     private let nowProvider: () -> Date
     private let updatesWidgets: Bool
 
@@ -42,18 +43,21 @@ final class BudgetStore: ObservableObject {
         categorizer: SpendingCategorizing? = nil,
         calculator: BudgetCalculator? = nil,
         persistence: BudgetPersisting? = nil,
+        calendar: Calendar = .current,
         updatesWidgets: Bool = true,
         nowProvider: @escaping () -> Date = Date.init
     ) {
         self.categorizer = categorizer ?? AppleIntelligenceSpendingCategorizer()
         self.calculator = calculator ?? BudgetCalculator()
         self.persistence = persistence ?? BudgetPersistenceFactory.makeDefault()
+        self.calendar = calendar
         self.nowProvider = nowProvider
         self.updatesWidgets = updatesWidgets
         self.expenses = self.persistence.loadExpenses().sorted { $0.date > $1.date }
 
         self.monthWindowMode = self.persistence.loadMonthWindowMode() ?? .sliding
         self.weekWindowMode = self.persistence.loadWeekWindowMode() ?? .sliding
+        materializeRecurringExpenses()
         updateWidgetSnapshot()
     }
 
@@ -62,13 +66,16 @@ final class BudgetStore: ObservableObject {
     }
 
     @discardableResult
-    func addExpense(amount: Decimal, note: String, date: Date? = nil) -> Expense {
+    func addExpense(amount: Decimal, note: String, date: Date? = nil, recurrence: RecurrenceFrequency? = nil) -> Expense {
+        let expenseDate = date ?? nowProvider()
         let expense = Expense(
             amount: amount,
             note: note,
-            date: date ?? nowProvider(),
+            date: expenseDate,
             category: .awkward,
-            categorizationState: .pending
+            categorizationState: .pending,
+            recurrence: recurrence,
+            nextOccurrenceDate: recurrence.map { $0.nextDate(after: expenseDate, calendar: calendar) }
         )
 
         expenses.insert(expense, at: 0)
@@ -84,6 +91,58 @@ final class BudgetStore: ObservableObject {
         expenses = persistence.loadExpenses().sorted { $0.date > $1.date }
         monthWindowMode = persistence.loadMonthWindowMode() ?? monthWindowMode
         weekWindowMode = persistence.loadWeekWindowMode() ?? weekWindowMode
+        materializeRecurringExpenses()
+    }
+
+    func materializeRecurringExpenses() {
+        let now = nowProvider()
+        var updated = expenses
+        var generated: [Expense] = []
+        var pendingCategorization: [Expense] = []
+
+        for index in updated.indices where updated[index].recurrence != nil {
+            guard let frequency = updated[index].recurrence else {
+                continue
+            }
+
+            let template = updated[index]
+            var nextDue = template.nextOccurrenceDate ?? frequency.nextDate(after: template.date, calendar: calendar)
+            var safetyLimit = 400
+
+            while nextDue <= now, safetyLimit > 0 {
+                let instance = Expense(
+                    amount: template.amount,
+                    note: template.note,
+                    date: nextDue,
+                    category: template.category,
+                    categorizationState: template.categorizationState == .categorized ? .categorized : .pending,
+                    recurringSourceID: template.id
+                )
+
+                generated.append(instance)
+
+                if instance.categorizationState == .pending {
+                    pendingCategorization.append(instance)
+                }
+
+                let following = frequency.nextDate(after: nextDue, calendar: calendar)
+                guard following > nextDue else {
+                    break
+                }
+
+                nextDue = following
+                safetyLimit -= 1
+            }
+
+            updated[index].nextOccurrenceDate = nextDue
+        }
+
+        guard !generated.isEmpty || updated != expenses else {
+            return
+        }
+
+        expenses = (updated + generated).sorted { $0.date > $1.date }
+        pendingCategorization.forEach(categorizeInBackground)
     }
 
     func total(for period: BudgetPeriod) -> Decimal {
