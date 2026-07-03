@@ -155,6 +155,9 @@
         }
       }
     },
+    "Data Sync" : {
+
+    },
     "Delete expense" : {
 
     },
@@ -178,8 +181,15 @@
     "Expense categorization uses Apple's Foundation Models on device. No API key is stored, and no expense description is sent to an external AI server." : {
 
     },
-    "Expenses and window preferences sync through your private CloudKit database when iCloud is available." : {
-
+    "Great for subscriptions. Future charges are logged automatically every %@, starting %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Great for subscriptions. Future charges are logged automatically every %1$@, starting %2$@."
+          }
+        }
+      }
     },
     "How much did you spend?" : {
 
@@ -220,9 +230,6 @@
 
     },
     "Private by design: your data stays in your personal iCloud." : {
-
-    },
-    "Private iCloud sync" : {
 
     },
     "Pull to chat" : {
@@ -281,6 +288,18 @@
         }
       }
     },
+    "Recurring" : {
+
+    },
+    "Recurring expense" : {
+
+    },
+    "Repeat" : {
+
+    },
+    "Repeats" : {
+
+    },
     "See monthly, weekly, and daily spending together." : {
 
     },
@@ -305,9 +324,6 @@
 
     },
     "Stop recording" : {
-
-    },
-    "Suggested categories" : {
 
     },
     "System matches your device's light or dark mode setting." : {
@@ -344,7 +360,10 @@
     "Theme" : {
 
     },
-    "Totals update immediately. Category cleanup runs after this screen closes." : {
+    "This shows the current storage path and iCloud account availability. iOS manages the exact upload and download timing." : {
+
+    },
+    "Totals update immediately. The category is assigned automatically after this screen closes." : {
 
     },
     "transaction" : {
@@ -357,6 +376,9 @@
           }
         }
       }
+    },
+    "Turn this on for subscriptions and other charges that repeat on a schedule." : {
+
     },
     "vs %@ %@" : {
       "localizations" : {

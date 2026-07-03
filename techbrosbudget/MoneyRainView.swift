@@ -18,9 +18,6 @@ private struct DollarBill: Identifiable {
     var rotation: Double
     var angularVelocity: Double
     var scale: CGFloat
-    var opacity: Double = 1
-    var hasBounced = false
-    var restTime: Double = 0
     var age: Double = 0
 }
 
@@ -134,8 +131,6 @@ final class MoneyRainSimulator: ObservableObject {
         lastTimestamp = link.timestamp
 
         let gravity = screenGravity
-        let floorY = bounds.height - Self.emojiSize / 2 - 4
-        let sideMargin = Self.emojiSize / 2
 
         for index in bills.indices {
             var bill = bills[index]
@@ -153,44 +148,21 @@ final class MoneyRainSimulator: ObservableObject {
             bill.position.y += bill.velocity.dy * dt
             bill.rotation += bill.angularVelocity * dt
 
-            if bill.position.x < sideMargin {
-                bill.position.x = sideMargin
-                bill.velocity.dx = abs(bill.velocity.dx) * 0.35
-            } else if bill.position.x > bounds.width - sideMargin {
-                bill.position.x = bounds.width - sideMargin
-                bill.velocity.dx = -abs(bill.velocity.dx) * 0.35
-            }
-
-            if bill.position.y >= floorY {
-                bill.position.y = floorY
-
-                if !bill.hasBounced && bill.velocity.dy > 140 {
-                    bill.hasBounced = true
-                    bill.velocity.dy = -bill.velocity.dy * 0.38
-                    bill.velocity.dx *= 0.7
-                    bill.angularVelocity *= 0.6
-                } else {
-                    // Settled on the floor: it can still slide when tilted,
-                    // but friction bleeds the motion away.
-                    bill.velocity.dy = 0
-                    bill.velocity.dx *= 1 - 3.0 * dt
-                    bill.angularVelocity *= 1 - 4.0 * dt
-
-                    if abs(bill.velocity.dx) < 25 {
-                        bill.restTime += dt
-                    }
-                }
-            }
-
-            // Fade out gracefully once at rest, or after a long airborne life.
-            if bill.restTime > 0.9 || bill.age > 8 {
-                bill.opacity -= dt / 0.55
-            }
-
             bills[index] = bill
         }
 
-        bills.removeAll { $0.opacity <= 0 }
+        // No floor: bills simply fall out of whichever edge the phone is tilted
+        // toward. Cull a bill only once gravity has carried it fully past that
+        // edge, so the initial upward burst isn't dropped before it arcs back
+        // into view. A generous age cap backstops any stragglers.
+        let margin = Self.emojiSize
+        bills.removeAll { bill in
+            (bill.position.y > bounds.height + margin && gravity.dy > 0)
+                || (bill.position.y < -margin && gravity.dy < 0)
+                || (bill.position.x > bounds.width + margin && gravity.dx > 0)
+                || (bill.position.x < -margin && gravity.dx < 0)
+                || bill.age > 12
+        }
 
         if bills.isEmpty {
             stop()
@@ -207,7 +179,6 @@ struct MoneyRainOverlay: View {
             Canvas { context, _ in
                 for bill in simulator.bills {
                     var billContext = context
-                    billContext.opacity = bill.opacity
                     billContext.translateBy(x: bill.position.x, y: bill.position.y)
                     billContext.rotate(by: .radians(bill.rotation))
                     billContext.draw(
