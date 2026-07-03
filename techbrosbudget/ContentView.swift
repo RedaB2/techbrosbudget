@@ -5,6 +5,7 @@
 //  Created by Reda Boutayeb on 6/14/26.
 //
 
+import CloudKit
 import SwiftUI
 
 private func opensBudgetChatForUITests() -> Bool {
@@ -88,7 +89,7 @@ struct ContentView: View {
                     .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $isShowingSettings) {
-                SettingsView()
+                SettingsView(store: store)
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
             }
@@ -770,12 +771,21 @@ private struct ExpenseRow: View {
 }
 
 private struct SettingsView: View {
+    @ObservedObject var store: BudgetStore
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppearanceSetting.storageKey) private var appearanceRawValue = AppearanceSetting.system.rawValue
     @State private var intelligenceSummary = AppleIntelligenceSpendingCategorizer.availabilitySummary()
+    @State private var iCloudAccountStatus = ICloudAccountStatus.checking
 
     private var appearanceSetting: AppearanceSetting {
         AppearanceSetting(rawValue: appearanceRawValue) ?? .system
+    }
+
+    private var syncPresentation: SyncStatusPresentation {
+        SyncStatusPresentation(
+            storageBackend: store.storageBackend,
+            iCloudAccountStatus: iCloudAccountStatus
+        )
     }
 
     var body: some View {
@@ -820,17 +830,26 @@ private struct SettingsView: View {
                 Section {
                     Label {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Private iCloud sync")
+                            Text(syncPresentation.title)
                                 .font(.body.weight(.semibold))
 
-                            Text("Expenses and window preferences sync through your private CloudKit database when iCloud is available.")
+                            Text(syncPresentation.detail)
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
                     } icon: {
-                        Image(systemName: "icloud")
-                            .foregroundStyle(.blue)
+                        if syncPresentation.showsProgress {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: syncPresentation.iconName)
+                                .foregroundStyle(syncPresentation.tint)
+                        }
                     }
+                } header: {
+                    Text("Data Sync")
+                } footer: {
+                    Text("This shows the current storage path and iCloud account availability. iOS manages the exact upload and download timing.")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -847,6 +866,158 @@ private struct SettingsView: View {
             .onAppear {
                 intelligenceSummary = AppleIntelligenceSpendingCategorizer.availabilitySummary()
             }
+            .task {
+                await refreshICloudAccountStatus()
+            }
+        }
+    }
+
+    @MainActor
+    private func refreshICloudAccountStatus() async {
+        guard case .cloudKitPrivateDatabase(let containerIdentifier) = store.storageBackend else {
+            iCloudAccountStatus = .notApplicable
+            return
+        }
+
+        iCloudAccountStatus = .checking
+        iCloudAccountStatus = await ICloudAccountStatus.current(containerIdentifier: containerIdentifier)
+    }
+}
+
+private enum ICloudAccountStatus: Equatable {
+    case notApplicable
+    case checking
+    case available
+    case noAccount
+    case restricted
+    case temporarilyUnavailable
+    case couldNotDetermine
+
+    static func current(containerIdentifier: String) async -> ICloudAccountStatus {
+        await withCheckedContinuation { continuation in
+            CKContainer(identifier: containerIdentifier).accountStatus { status, error in
+                guard error == nil else {
+                    continuation.resume(returning: .couldNotDetermine)
+                    return
+                }
+
+                continuation.resume(returning: ICloudAccountStatus(status))
+            }
+        }
+    }
+
+    init(_ status: CKAccountStatus) {
+        switch status {
+        case .available:
+            self = .available
+        case .noAccount:
+            self = .noAccount
+        case .restricted:
+            self = .restricted
+        case .temporarilyUnavailable:
+            self = .temporarilyUnavailable
+        case .couldNotDetermine:
+            self = .couldNotDetermine
+        @unknown default:
+            self = .couldNotDetermine
+        }
+    }
+}
+
+private struct SyncStatusPresentation {
+    let title: String
+    let detail: String
+    let iconName: String
+    let tint: Color
+    let showsProgress: Bool
+
+    private init(
+        title: String,
+        detail: String,
+        iconName: String,
+        tint: Color,
+        showsProgress: Bool
+    ) {
+        self.title = title
+        self.detail = detail
+        self.iconName = iconName
+        self.tint = tint
+        self.showsProgress = showsProgress
+    }
+
+    init(storageBackend: BudgetStorageBackend, iCloudAccountStatus: ICloudAccountStatus) {
+        switch storageBackend {
+        case .cloudKitPrivateDatabase:
+            self = Self.cloudKitStatus(iCloudAccountStatus: iCloudAccountStatus)
+        case .localDeviceOnly:
+            self = Self(
+                title: "Stored on this device",
+                detail: "iCloud sync is not active on this launch. Expenses are saved locally only.",
+                iconName: "externaldrive.fill",
+                tint: .orange,
+                showsProgress: false
+            )
+        case .preview:
+            self = Self(
+                title: "Preview data",
+                detail: "This run uses local preview data and does not sync to iCloud.",
+                iconName: "eye.fill",
+                tint: .secondary,
+                showsProgress: false
+            )
+        }
+    }
+
+    private static func cloudKitStatus(iCloudAccountStatus: ICloudAccountStatus) -> SyncStatusPresentation {
+        switch iCloudAccountStatus {
+        case .notApplicable, .checking:
+            return SyncStatusPresentation(
+                title: "Checking iCloud sync",
+                detail: "Looking up this device's iCloud account status.",
+                iconName: "icloud.fill",
+                tint: .blue,
+                showsProgress: true
+            )
+        case .available:
+            return SyncStatusPresentation(
+                title: "Syncing to iCloud",
+                detail: "Expenses, recurring schedules, and window preferences use your private iCloud database.",
+                iconName: "icloud.fill",
+                tint: .green,
+                showsProgress: false
+            )
+        case .noAccount:
+            return SyncStatusPresentation(
+                title: "Local until signed in to iCloud",
+                detail: "Sign in to iCloud on this device to sync expenses.",
+                iconName: "icloud.slash",
+                tint: .orange,
+                showsProgress: false
+            )
+        case .restricted:
+            return SyncStatusPresentation(
+                title: "iCloud sync restricted",
+                detail: "This device or account restricts iCloud access, so data may remain local here.",
+                iconName: "lock.fill",
+                tint: .orange,
+                showsProgress: false
+            )
+        case .temporarilyUnavailable:
+            return SyncStatusPresentation(
+                title: "iCloud temporarily unavailable",
+                detail: "iOS cannot reach iCloud account services right now. Sync should resume when available.",
+                iconName: "exclamationmark.triangle.fill",
+                tint: .orange,
+                showsProgress: false
+            )
+        case .couldNotDetermine:
+            return SyncStatusPresentation(
+                title: "Sync status unavailable",
+                detail: "The app is configured for CloudKit, but iOS could not confirm the current iCloud account status.",
+                iconName: "questionmark.circle.fill",
+                tint: .secondary,
+                showsProgress: false
+            )
         }
     }
 }
@@ -1127,4 +1298,8 @@ private extension SpendingCategory {
             return color
         }
     }
+}
+
+#Preview {
+    ContentView()
 }

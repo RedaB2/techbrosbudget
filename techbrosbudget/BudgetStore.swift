@@ -39,6 +39,10 @@ final class BudgetStore: ObservableObject {
     private let nowProvider: () -> Date
     private let updatesWidgets: Bool
 
+    var storageBackend: BudgetStorageBackend {
+        persistence.storageBackend
+    }
+
     init(
         categorizer: SpendingCategorizing? = nil,
         calculator: BudgetCalculator? = nil,
@@ -256,6 +260,10 @@ extension BudgetStore {
 }
 
 private struct PreviewExpenseStore: BudgetPersisting {
+    var storageBackend: BudgetStorageBackend {
+        .preview
+    }
+
     func loadExpenses() -> [Expense] { [] }
     func saveExpenses(_ expenses: [Expense]) {}
     func loadMonthWindowMode() -> SpendingWindowMode? { .sliding }

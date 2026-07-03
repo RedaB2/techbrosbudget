@@ -10,12 +10,26 @@ import SwiftData
 
 @MainActor
 protocol BudgetPersisting {
+    var storageBackend: BudgetStorageBackend { get }
+
     func loadExpenses() -> [Expense]
     func saveExpenses(_ expenses: [Expense])
     func loadMonthWindowMode() -> SpendingWindowMode?
     func saveMonthWindowMode(_ mode: SpendingWindowMode)
     func loadWeekWindowMode() -> SpendingWindowMode?
     func saveWeekWindowMode(_ mode: SpendingWindowMode)
+}
+
+enum BudgetStorageBackend: Equatable {
+    case cloudKitPrivateDatabase(containerIdentifier: String)
+    case localDeviceOnly
+    case preview
+}
+
+extension BudgetPersisting {
+    var storageBackend: BudgetStorageBackend {
+        .localDeviceOnly
+    }
 }
 
 enum BudgetPersistenceFactory {
@@ -95,6 +109,10 @@ final class SwiftDataBudgetStore: BudgetPersisting {
 
     private let container: ModelContainer
     private let context: ModelContext
+
+    var storageBackend: BudgetStorageBackend {
+        .cloudKitPrivateDatabase(containerIdentifier: Self.cloudKitContainerIdentifier)
+    }
 
     init() throws {
         let schema = Schema([
