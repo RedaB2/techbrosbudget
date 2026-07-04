@@ -49,13 +49,10 @@ struct BudgetChatView: View {
 
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 36, height: 36)
-                    .contentShape(Circle())
+                    .font(.system(size: 13, weight: .light))
+                    .foregroundStyle(Monolith.secondary)
             }
-            .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: .circle)
+            .buttonStyle(MonolithRingButtonStyle(diameter: 36))
             .accessibilityLabel("Close")
         }
         .padding(.horizontal, 20)
@@ -122,20 +119,19 @@ struct BudgetChatView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Not Available")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Monolith.negative)
 
                     Text("Apple Intelligence isn't enabled. Head to Settings → Apple Intelligence & Siri to turn it on.")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Monolith.secondary)
                 }
 
                 Spacer(minLength: 40)
             }
             .padding(14)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(.white.opacity(0.15), lineWidth: 0.5)
+                    .strokeBorder(Monolith.hairline, lineWidth: 1)
             }
         }
     }
@@ -148,12 +144,11 @@ struct BudgetChatView: View {
                 } label: {
                     Text(prompt)
                         .font(.subheadline)
-                        .foregroundStyle(.teal)
+                        .foregroundStyle(Monolith.primary)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 9)
-                        .background(Color.teal.opacity(0.1), in: Capsule())
                         .overlay {
-                            Capsule().strokeBorder(Color.teal.opacity(0.35), lineWidth: 1)
+                            Capsule().strokeBorder(Monolith.ring, lineWidth: 1)
                         }
                 }
                 .buttonStyle(.plain)
@@ -192,14 +187,11 @@ struct BudgetChatView: View {
                 Task { await session.startRecording() }
             }
         } label: {
-            Image(systemName: session.isRecording ? "stop.fill" : "mic.fill")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(session.isRecording ? .red : .primary)
-                .frame(width: kInputHeight, height: kInputHeight)
-                .contentShape(Circle())
+            Image(systemName: session.isRecording ? "stop.fill" : "mic")
+                .font(.system(size: 16, weight: .light))
+                .foregroundStyle(session.isRecording ? Monolith.negative : Monolith.secondary)
         }
-        .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .circle)
+        .buttonStyle(MonolithRingButtonStyle(diameter: kInputHeight))
         .symbolEffect(.pulse, isActive: session.isRecording)
         .accessibilityLabel(session.isRecording ? "Stop recording" : "Record voice message")
     }
@@ -220,10 +212,10 @@ struct BudgetChatView: View {
         // subheadline line height ≈ 20 pt → (kInputHeight - 20) / 2 ≈ 12
         .padding(.vertical, 12)
         .frame(minHeight: kInputHeight)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: kInputHeight / 2, style: .continuous))
+        .background(Monolith.background.opacity(0.88), in: RoundedRectangle(cornerRadius: kInputHeight / 2, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: kInputHeight / 2, style: .continuous)
-                .strokeBorder(.white.opacity(0.2), lineWidth: 0.5)
+                .strokeBorder(Monolith.ring, lineWidth: 1)
         }
         .focused($inputFocused)
     }
@@ -239,14 +231,14 @@ struct BudgetChatView: View {
             Task { await session.send(text) }
         } label: {
             Image(systemName: "arrow.up")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(.white)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Monolith.background)
                 .frame(width: kInputHeight, height: kInputHeight)
+                .background(Monolith.primary, in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.tint(.teal).interactive(), in: .circle)
-        .opacity(canSend ? 1 : 0.45)
+        .opacity(canSend ? 1 : 0.4)
         .disabled(!canSend)
         .accessibilityLabel("Send message")
     }
@@ -263,10 +255,10 @@ private struct MessageBubble: View {
                 Spacer(minLength: 60)
                 Text(message.content)
                     .font(.subheadline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Monolith.background)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(.teal.gradient, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(Monolith.primary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .textSelection(.enabled)
             }
         } else {
@@ -284,13 +276,13 @@ private struct AssistantBubble: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(BudgetChatMarkdown.attributedString(from: content))
                     .font(.subheadline)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Monolith.primary)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(Monolith.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     .overlay {
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+                            .strokeBorder(Monolith.hairline, lineWidth: 1)
                     }
                     .textSelection(.enabled)
 
@@ -310,7 +302,7 @@ private struct StreamingCursor: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: 1)
-            .fill(Color.teal)
+            .fill(Monolith.primary)
             .frame(width: 2, height: 12)
             .opacity(visible ? 1 : 0.15)
             .onAppear {
@@ -330,7 +322,7 @@ private struct TypingBubble: View {
                 ForEach(0..<3, id: \.self) { i in
                     Circle()
                         .frame(width: 7, height: 7)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Monolith.tertiary)
                         .offset(y: animating ? -4 : 0)
                         .animation(
                             .easeInOut(duration: 0.45)
@@ -342,7 +334,10 @@ private struct TypingBubble: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(Monolith.hairline, lineWidth: 1)
+            }
             .onAppear { animating = true }
 
             Spacer(minLength: 40)
@@ -361,30 +356,14 @@ private struct TechBroAvatar: View {
             .scaledToFit()
             .padding(size * 0.1)
             .frame(width: size, height: size)
-            .background(Color.teal.opacity(0.12), in: Circle())
-            .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 0.5))
+            .overlay(Circle().strokeBorder(Monolith.ring, lineWidth: 1))
     }
 }
 
 // MARK: - Background
 
 private struct ChatBackground: View {
-    @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
     var body: some View {
-        ZStack {
-            Color(.systemBackground)
-            if !reduceTransparency {
-                LinearGradient(
-                    colors: colorScheme == .dark
-                        ? [Color.teal.opacity(0.1), Color.indigo.opacity(0.08), Color(.systemBackground)]
-                        : [Color.teal.opacity(0.07), Color.mint.opacity(0.09), Color(.systemBackground)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-        }
-        .ignoresSafeArea()
+        BudgetBackground()
     }
 }

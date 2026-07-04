@@ -25,7 +25,8 @@ final class techbrosbudgetUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Month"].exists)
         XCTAssertTrue(app.staticTexts["Week"].exists)
         XCTAssertTrue(app.staticTexts["Today"].exists)
-        XCTAssertTrue(app.staticTexts["Categories"].exists)
+        // Categories moved off the home screen into the period detail view.
+        XCTAssertFalse(app.staticTexts["Categories"].exists)
         XCTAssertTrue(app.staticTexts["Recent"].exists)
         XCTAssertTrue(app.buttons["Add expense"].isHittable)
         XCTAssertTrue(app.buttons["Settings"].isHittable)
@@ -95,6 +96,73 @@ final class techbrosbudgetUITests: XCTestCase {
         attachment.name = "Budget chat rendered markdown"
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    @MainActor
+    func testAddExpenseSavesThroughSingleMonolithButton() throws {
+        let app = makePreviewApp()
+        app.launch()
+
+        XCTAssertTrue(app.buttons["Add expense"].waitForExistence(timeout: 5))
+        app.buttons["Add expense"].tap()
+
+        let amountField = app.textFields["Amount"]
+        XCTAssertTrue(amountField.waitForExistence(timeout: 3))
+
+        // The redundant native toolbar buttons are gone; swipe-down closes,
+        // and the Monolith block button is the only way to save.
+        XCTAssertFalse(app.navigationBars.buttons["Add"].exists)
+        XCTAssertFalse(app.navigationBars.buttons["Cancel"].exists)
+
+        amountField.tap()
+        amountField.typeText("4.50")
+
+        // Expand the sheet so the save button is on screen.
+        app.swipeUp()
+
+        let saveButton = app.buttons["SaveExpenseButton"]
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 3))
+
+        // The simulator keyboard occasionally drops keys; make sure at least
+        // one digit landed so the button is enabled before saving.
+        if !saveButton.isEnabled {
+            amountField.tap()
+            amountField.typeText("2")
+            app.swipeUp()
+        }
+
+        XCTAssertTrue(saveButton.isEnabled)
+        saveButton.tap()
+
+        // Sheet dismisses and the new note-less expense shows up in Recent.
+        XCTAssertTrue(app.staticTexts["Expense"].waitForExistence(timeout: 5))
+        XCTAssertFalse(amountField.exists)
+    }
+
+    @MainActor
+    func testSwipeToDeleteRemovesRecentExpense() throws {
+        let app = makePreviewApp()
+        app.launch()
+
+        let row = app.staticTexts["Lyft back from office"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+
+        // The delete action stays out of the accessibility tree until revealed.
+        XCTAssertFalse(app.buttons["Delete expense"].exists)
+
+        row.swipeLeft()
+
+        let deleteButton = app.buttons["Delete expense"]
+        XCTAssertTrue(deleteButton.waitForExistence(timeout: 3))
+
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "Swipe to delete revealed"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        deleteButton.tap()
+
+        XCTAssertFalse(row.waitForExistence(timeout: 2))
     }
 
     @MainActor

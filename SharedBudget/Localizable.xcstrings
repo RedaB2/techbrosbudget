@@ -1,29 +1,39 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "/" : {
+    "" : {
+
+    },
+    "— even vs %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "— even vs %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "·" : {
 
     },
     "%@" : {
 
     },
-    "%lld" : {
-
-    },
-    "%lld %@ in this window" : {
+    "%@ %@ vs %@ · %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "%1$lld %2$@ in this window"
+            "value" : "%1$@ %2$@ vs %3$@ · %4$@"
           }
         }
       }
     },
-    "0.00" : {
+    "%lld" : {
 
     },
-    "Add" : {
+    "0.00" : {
 
     },
     "Add ${amount} spent on ${note}" : {
@@ -75,9 +85,6 @@
         }
       }
     },
-    "Appearance" : {
-
-    },
     "Apple Intelligence" : {
 
     },
@@ -101,16 +108,7 @@
     "Budget Overview" : {
 
     },
-    "Cancel" : {
-
-    },
-    "Categories" : {
-
-    },
     "Categorization pending" : {
-
-    },
-    "Category summary" : {
 
     },
     "Choose Amount" : {
@@ -141,6 +139,9 @@
     "Coffee, team lunch, taxi to the office" : {
 
     },
+    "Collapses details" : {
+
+    },
     "Continue" : {
 
     },
@@ -155,9 +156,6 @@
         }
       }
     },
-    "Data Sync" : {
-
-    },
     "Delete expense" : {
 
     },
@@ -165,6 +163,9 @@
 
     },
     "Done" : {
+
+    },
+    "Expands details" : {
 
     },
     "Expense" : {
@@ -201,12 +202,6 @@
 
     },
     "Message Tech Bro…" : {
-
-    },
-    "Month" : {
-
-    },
-    "Month window" : {
 
     },
     "Monthly" : {
@@ -294,12 +289,6 @@
     "Recurring expense" : {
 
     },
-    "Repeat" : {
-
-    },
-    "Repeats" : {
-
-    },
     "See monthly, weekly, and daily spending together." : {
 
     },
@@ -357,10 +346,10 @@
         }
       }
     },
-    "Theme" : {
+    "This shows the current storage path and iCloud account availability. iOS manages the exact upload and download timing." : {
 
     },
-    "This shows the current storage path and iCloud account availability. iOS manages the exact upload and download timing." : {
+    "Three numbers.\nZero friction." : {
 
     },
     "Totals update immediately. The category is assigned automatically after this screen closes." : {
@@ -378,22 +367,6 @@
       }
     },
     "Turn this on for subscriptions and other charges that repeat on a schedule." : {
-
-    },
-    "vs %@ %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "vs %1$@ %2$@"
-          }
-        }
-      }
-    },
-    "Week" : {
-
-    },
-    "Week window" : {
 
     },
     "Weekly" : {
@@ -422,9 +395,6 @@
       }
     },
     "What was it for?" : {
-
-    },
-    "Windows" : {
 
     }
   },

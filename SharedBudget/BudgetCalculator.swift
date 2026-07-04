@@ -122,6 +122,36 @@ struct BudgetCalculator {
         )
     }
 
+    /// Totals for the last `bucketCount` back-to-back windows of the period's
+    /// nominal length, ending at `now`, oldest first. Drives trend sparklines.
+    func trailingTotals(
+        for expenses: [Expense],
+        period: BudgetPeriod,
+        now: Date,
+        bucketCount: Int
+    ) -> [Decimal] {
+        let bucketLength: TimeInterval
+        switch period {
+        case .day:
+            bucketLength = 86_400
+        case .week:
+            bucketLength = 7 * 86_400
+        case .month:
+            bucketLength = 30 * 86_400
+        }
+
+        var totals: [Decimal] = []
+        var end = now
+
+        for _ in 0..<max(0, bucketCount) {
+            let start = end.addingTimeInterval(-bucketLength)
+            totals.append(total(for: expenses, in: DateInterval(start: start, end: end)))
+            end = start
+        }
+
+        return totals.reversed()
+    }
+
     func subtitle(for period: BudgetPeriod, mode: SpendingWindowMode, now: Date) -> String {
         let interval = interval(for: period, mode: mode, now: now)
 

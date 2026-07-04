@@ -18,49 +18,57 @@ struct OnboardingView: View {
                 Image("BrandLogoForeground")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 150, height: 150)
+                    .frame(width: 120, height: 120)
                     .accessibilityLabel("Tech Bros logo")
 
-                VStack(alignment: .leading, spacing: 20) {
-                    FeatureRow(
+                MonolithLabel("TechBros Budget", size: 11)
+                    .padding(.top, 18)
+
+                Text("Three numbers.\nZero friction.")
+                    .font(.system(size: 34, weight: .ultraLight))
+                    .foregroundStyle(Monolith.primary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 14)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    OnboardingFeatureRow(
                         icon: "plus.forwardslash.minus",
-                        tint: .mint,
                         title: "Log spending in seconds",
                         subtitle: "Type an amount and a note. Totals update immediately."
                     )
 
-                    FeatureRow(
+                    MonolithDivider()
+
+                    OnboardingFeatureRow(
                         icon: "sparkles",
-                        tint: .indigo,
                         title: "Categories sort themselves",
                         subtitle: "Apple Intelligence categorizes expenses on device, in the background."
                     )
 
-                    FeatureRow(
+                    MonolithDivider()
+
+                    OnboardingFeatureRow(
                         icon: "calendar",
-                        tint: .orange,
                         title: "Day, week, and month at a glance",
                         subtitle: "Compare each window with the previous one to spot trends."
                     )
                 }
-                .padding(.top, 36)
+                .padding(.top, 30)
                 .padding(.horizontal, 32)
 
                 Spacer(minLength: 24)
 
                 Button(action: onContinue) {
                     Text("Continue")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
                 }
-                .buttonStyle(.glassProminent)
+                .buttonStyle(MonolithBlockButtonStyle())
                 .accessibilityIdentifier("Continue")
-                .padding(.horizontal, 24)
+                .accessibilityLabel("Continue")
+                .padding(.horizontal, 28)
 
                 Text("Private by design: your data stays in your personal iCloud.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Monolith.tertiary)
                     .multilineTextAlignment(.center)
                     .padding(.top, 14)
                     .padding(.horizontal, 36)
@@ -70,31 +78,31 @@ struct OnboardingView: View {
     }
 }
 
-private struct FeatureRow: View {
+private struct OnboardingFeatureRow: View {
     let icon: String
-    let tint: Color
     let title: String
     let subtitle: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 16) {
             Image(systemName: icon)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .background(tint.gradient, in: Circle())
+                .font(.system(size: 16, weight: .light))
+                .foregroundStyle(Monolith.secondary)
+                .frame(width: 24)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Monolith.primary)
 
                 Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Monolith.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .padding(.vertical, 15)
         .accessibilityElement(children: .combine)
     }
 }

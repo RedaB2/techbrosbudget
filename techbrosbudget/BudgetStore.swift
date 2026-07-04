@@ -185,6 +185,17 @@ final class BudgetStore: ObservableObject {
         )
     }
 
+    /// Recent spend trend for sparklines, oldest bucket first.
+    func trend(for period: BudgetPeriod, buckets: Int = 10) -> [Double] {
+        calculator.trailingTotals(
+            for: expenses,
+            period: period,
+            now: nowProvider(),
+            bucketCount: buckets
+        )
+        .map { NSDecimalNumber(decimal: $0).doubleValue }
+    }
+
     func subtitle(for period: BudgetPeriod) -> String {
         calculator.subtitle(
             for: period,
@@ -259,15 +270,20 @@ extension BudgetStore {
     }
 }
 
-private struct PreviewExpenseStore: BudgetPersisting {
+/// In-memory persistence so preview/UI-test runs survive `reloadPersistedData()`.
+private final class PreviewExpenseStore: BudgetPersisting {
+    private var expenses: [Expense] = []
+    private var monthWindowMode: SpendingWindowMode = .sliding
+    private var weekWindowMode: SpendingWindowMode = .sliding
+
     var storageBackend: BudgetStorageBackend {
         .preview
     }
 
-    func loadExpenses() -> [Expense] { [] }
-    func saveExpenses(_ expenses: [Expense]) {}
-    func loadMonthWindowMode() -> SpendingWindowMode? { .sliding }
-    func saveMonthWindowMode(_ mode: SpendingWindowMode) {}
-    func loadWeekWindowMode() -> SpendingWindowMode? { .sliding }
-    func saveWeekWindowMode(_ mode: SpendingWindowMode) {}
+    func loadExpenses() -> [Expense] { expenses }
+    func saveExpenses(_ expenses: [Expense]) { self.expenses = expenses }
+    func loadMonthWindowMode() -> SpendingWindowMode? { monthWindowMode }
+    func saveMonthWindowMode(_ mode: SpendingWindowMode) { monthWindowMode = mode }
+    func loadWeekWindowMode() -> SpendingWindowMode? { weekWindowMode }
+    func saveWeekWindowMode(_ mode: SpendingWindowMode) { weekWindowMode = mode }
 }
