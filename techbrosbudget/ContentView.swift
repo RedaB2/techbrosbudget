@@ -25,6 +25,15 @@ struct ContentView: View {
     @State private var expandedPeriod: BudgetPeriod?
     @State private var bottomOverscroll: CGFloat = 0
     @StateObject private var moneyRain = MoneyRainSimulator()
+    @State private var vaultProgress: CGFloat = 0
+    @State private var isVaultOpen = false
+    @State private var logoCenter: CGPoint = .zero
+    /// Highest logged-expense milestone already celebrated with money rain,
+    /// so each milestone rains exactly once per device.
+    @AppStorage("celebratedExpenseMilestone") private var celebratedExpenseMilestone = 0
+
+    /// How far a drag must travel to fully reveal the vault.
+    private static let vaultRevealDistance: CGFloat = 320
 
     @MainActor
     init(store: BudgetStore? = nil) {
@@ -40,8 +49,12 @@ struct ContentView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         MonolithHeader(
                             onSettings: { isShowingSettings = true },
+                            onVault: { setVault(open: true) },
                             onLogoTap: { logoCenter in
                                 moneyRain.burst(from: logoCenter)
+                            },
+                            onLogoMoved: { center in
+                                logoCenter = center
                             }
                         )
 
@@ -78,9 +91,13 @@ struct ContentView: View {
                 .accessibilityLabel("Add expense")
                 .padding(.bottom, 24)
 
+                vaultLayer
+
                 MoneyRainOverlay(simulator: moneyRain)
             }
+            .simultaneousGesture(vaultOpenGesture)
             .sensoryFeedback(.impact(weight: .light), trigger: expandedPeriod)
+            .sensoryFeedback(.impact(weight: .medium), trigger: isVaultOpen)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $isAddingExpense) {
@@ -109,6 +126,107 @@ struct ContentView: View {
                     store.reloadPersistedData()
                 }
             }
+            .onChange(of: store.expenses.count) { oldCount, newCount in
+                if newCount > oldCount {
+                    celebrateMilestoneIfReached(totalLogged: newCount)
+                }
+            }
+        }
+    }
+
+    // MARK: - Vault
+
+    /// The Vault sits offscreen to the left of the home screen and tracks the
+    /// finger during a left-to-right swipe, sliding fully in past a threshold.
+    private var vaultLayer: some View {
+        GeometryReader { geo in
+            VaultView(store: store) {
+                setVault(open: false)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .overlay(alignment: .trailing) {
+                Rectangle()
+                    .fill(Monolith.hairline)
+                    .frame(width: 1)
+                    .ignoresSafeArea()
+            }
+            .offset(x: (vaultProgress - 1) * geo.size.width)
+            .simultaneousGesture(vaultCloseGesture)
+        }
+        .accessibilityHidden(vaultProgress < 1)
+    }
+
+    private var vaultOpenGesture: some Gesture {
+        DragGesture(minimumDistance: 25)
+            .onChanged { value in
+                guard !isVaultOpen else { return }
+
+                let translation = value.translation
+                guard translation.width > 0, abs(translation.width) > abs(translation.height) else {
+                    return
+                }
+
+                vaultProgress = min(1, translation.width / Self.vaultRevealDistance)
+            }
+            .onEnded { value in
+                guard !isVaultOpen else { return }
+                guard vaultProgress > 0 else { return }
+
+                let opens = vaultProgress > 0.35
+                    || value.predictedEndTranslation.width > Self.vaultRevealDistance
+                setVault(open: opens)
+            }
+    }
+
+    private var vaultCloseGesture: some Gesture {
+        DragGesture(minimumDistance: 25)
+            .onChanged { value in
+                guard isVaultOpen else { return }
+
+                let translation = value.translation
+                guard translation.width < 0, abs(translation.width) > abs(translation.height) else {
+                    return
+                }
+
+                vaultProgress = max(0, 1 + translation.width / Self.vaultRevealDistance)
+            }
+            .onEnded { value in
+                guard isVaultOpen else { return }
+
+                let closes = vaultProgress < 0.65
+                    || value.predictedEndTranslation.width < -Self.vaultRevealDistance
+                setVault(open: !closes)
+            }
+    }
+
+    private func setVault(open: Bool) {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.86)) {
+            vaultProgress = open ? 1 : 0
+        }
+        isVaultOpen = open
+    }
+
+    // MARK: - Milestones
+
+    /// Reaching a logged-expense milestone throws cash from the TECH BROS logo.
+    private func celebrateMilestoneIfReached(totalLogged: Int) {
+        guard let milestone = VaultLedger.expenseMilestones.last(where: { $0.count <= totalLogged }),
+              milestone.count > celebratedExpenseMilestone else {
+            return
+        }
+
+        celebratedExpenseMilestone = milestone.count
+
+        Task { @MainActor in
+            // Let the add-expense sheet settle before it starts raining.
+            try? await Task.sleep(for: .seconds(0.5))
+
+            for _ in 0..<3 {
+                guard logoCenter != .zero else { break }
+
+                moneyRain.burst(from: logoCenter)
+                try? await Task.sleep(for: .seconds(0.25))
+            }
         }
     }
 }
@@ -117,7 +235,9 @@ struct ContentView: View {
 
 private struct MonolithHeader: View {
     let onSettings: () -> Void
+    let onVault: () -> Void
     let onLogoTap: (CGPoint) -> Void
+    let onLogoMoved: (CGPoint) -> Void
 
     @State private var jiggleCount = 0
     @State private var logoCenter: CGPoint = .zero
@@ -159,11 +279,16 @@ private struct MonolithHeader: View {
                 return CGPoint(x: frame.midX, y: frame.midY)
             } action: { center in
                 logoCenter = center
+                onLogoMoved(center)
             }
             .accessibilityLabel("Tech Bros logo")
             .accessibilityHint("Makes it rain dollars")
 
             HStack {
+                MonolithIconButton(systemName: "rectangle.portrait", action: onVault)
+                    .accessibilityLabel("The Vault")
+                    .accessibilityHint("Shows your logging record and minted monoliths")
+
                 Spacer()
 
                 MonolithIconButton(systemName: "gearshape", action: onSettings)
@@ -965,6 +1090,62 @@ private struct SyncStatusPresentation {
     }
 }
 
+// MARK: - Info disclosure
+
+/// A muted info glyph that toggles a bound flag. Lets an explanatory line stay
+/// hidden until the user asks for it, keeping the form uncluttered.
+private struct MonolithInfoButton: View {
+    @Binding var isOn: Bool
+    let subject: String
+
+    var body: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isOn.toggle()
+            }
+        } label: {
+            Image(systemName: "info.circle")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(isOn ? Monolith.secondary : Monolith.tertiary)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isOn ? "Hide info about \(subject)" : "Show info about \(subject)")
+    }
+}
+
+/// A section label paired with an info button, so the header can reveal its own
+/// help text on demand.
+private struct MonolithInfoLabel: View {
+    let title: String
+    @Binding var isShowingInfo: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            MonolithLabel(title)
+            MonolithInfoButton(isOn: $isShowingInfo, subject: title)
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// Small helper for the muted explanatory lines revealed by an info button.
+private struct MonolithInfoText: View {
+    let text: LocalizedStringKey
+
+    init(_ text: LocalizedStringKey) {
+        self.text = text
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12))
+            .foregroundStyle(Monolith.tertiary)
+            .fixedSize(horizontal: false, vertical: true)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+}
+
 // MARK: - Add expense
 
 private struct AddExpenseView: View {
@@ -975,6 +1156,8 @@ private struct AddExpenseView: View {
     @State private var note = ""
     @State private var isRecurring = false
     @State private var recurrenceFrequency = RecurrenceFrequency.monthly
+    @State private var isShowingNoteInfo = false
+    @State private var isShowingRecurringInfo = false
 
     private enum Field {
         case amount
@@ -1023,7 +1206,7 @@ private struct AddExpenseView: View {
                         MonolithDivider()
                             .padding(.top, 6)
 
-                        MonolithLabel("Note")
+                        MonolithInfoLabel(title: "Note", isShowingInfo: $isShowingNoteInfo)
                             .padding(.top, 30)
                             .padding(.bottom, 10)
 
@@ -1037,13 +1220,15 @@ private struct AddExpenseView: View {
                         MonolithDivider()
                             .padding(.top, 6)
 
-                        Text("Totals update immediately. The category is assigned automatically after this screen closes.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Monolith.tertiary)
-                            .padding(.top, 12)
+                        if isShowingNoteInfo {
+                            MonolithInfoText("Totals update immediately. The category is assigned automatically after this screen closes.")
+                                .padding(.top, 12)
+                        }
 
-                        HStack {
+                        HStack(spacing: 8) {
                             MonolithLabel("Recurring expense")
+
+                            MonolithInfoButton(isOn: $isShowingRecurringInfo, subject: "Recurring expense")
 
                             Spacer()
 
@@ -1054,22 +1239,22 @@ private struct AddExpenseView: View {
                         }
                         .padding(.top, 34)
 
+                        if isShowingRecurringInfo {
+                            if isRecurring {
+                                MonolithInfoText("Great for subscriptions. Future charges are logged automatically every \(recurrenceFrequency.intervalNoun), starting \(recurrenceFrequency.nextDate(after: Date()), format: .dateTime.month(.abbreviated).day()).")
+                                    .padding(.top, 14)
+                            } else {
+                                MonolithInfoText("Turn this on for subscriptions and other charges that repeat on a schedule.")
+                                    .padding(.top, 14)
+                            }
+                        }
+
                         if isRecurring {
                             MonolithTextTabs(
                                 options: RecurrenceFrequency.allCases.map { ($0, $0.title) },
                                 selection: $recurrenceFrequency
                             )
                             .padding(.top, 16)
-
-                            Text("Great for subscriptions. Future charges are logged automatically every \(recurrenceFrequency.intervalNoun), starting \(recurrenceFrequency.nextDate(after: Date()), format: .dateTime.month(.abbreviated).day()).")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Monolith.tertiary)
-                                .padding(.top, 14)
-                        } else {
-                            Text("Turn this on for subscriptions and other charges that repeat on a schedule.")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Monolith.tertiary)
-                                .padding(.top, 14)
                         }
 
                         Button {

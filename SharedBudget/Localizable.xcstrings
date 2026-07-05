@@ -20,6 +20,16 @@
     "%@" : {
 
     },
+    "%@ · %lld logged" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$lld logged"
+          }
+        }
+      }
+    },
     "%@ %@ vs %@ · %@" : {
       "localizations" : {
         "en" : {
@@ -30,8 +40,41 @@
         }
       }
     },
+    "%@: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
+    "%@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@. %2$@"
+          }
+        }
+      }
+    },
     "%lld" : {
 
+    },
+    "%lld days recorded" : {
+
+    },
+    "%lld logged · %lld perfect %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld logged · %2$lld perfect %3$@"
+          }
+        }
+      }
     },
     "0.00" : {
 
@@ -89,6 +132,9 @@
 
     },
     "Apple Intelligence isn't enabled. Head to Settings → Apple Intelligence & Siri to turn it on." : {
+
+    },
+    "Back to budget" : {
 
     },
     "budget" : {
@@ -192,10 +238,16 @@
         }
       }
     },
+    "Hide info about %@" : {
+
+    },
     "How much did you spend?" : {
 
     },
     "Listening…" : {
+
+    },
+    "Log your first expense to mint the Genesis monolith." : {
 
     },
     "Makes it rain dollars" : {
@@ -298,6 +350,15 @@
     "Settings" : {
 
     },
+    "Shelf of minted monoliths" : {
+
+    },
+    "Show info about %@" : {
+
+    },
+    "Shows your logging record and minted monoliths" : {
+
+    },
     "spending" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -345,6 +406,9 @@
           }
         }
       }
+    },
+    "The Vault" : {
+
     },
     "This shows the current storage path and iCloud account availability. iOS manages the exact upload and download timing." : {
 
