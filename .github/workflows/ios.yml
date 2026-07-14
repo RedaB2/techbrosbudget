@@ -126,6 +126,12 @@ jobs:
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: scripts/ci/setup-asc-key.sh
 
+      - name: Import signing certificate
+        env:
+          DIST_CERT_P12_BASE64: ${{ secrets.DIST_CERT_P12_BASE64 }}
+          DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
+        run: scripts/ci/setup-signing-cert.sh
+
       - name: Publish external TestFlight build
         env:
           ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
@@ -165,6 +171,12 @@ jobs:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
         run: scripts/ci/setup-asc-key.sh
+
+      - name: Import signing certificate
+        env:
+          DIST_CERT_P12_BASE64: ${{ secrets.DIST_CERT_P12_BASE64 }}
+          DIST_CERT_PASSWORD: ${{ secrets.DIST_CERT_PASSWORD }}
+        run: scripts/ci/setup-signing-cert.sh
 
       - name: Publish App Store build
         env:

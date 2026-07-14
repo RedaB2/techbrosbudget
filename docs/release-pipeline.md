@@ -52,10 +52,40 @@ Create these in GitHub repository settings under **Secrets and variables > Actio
 - `ASC_KEY_ID`: App Store Connect API key ID.
 - `ASC_ISSUER_ID`: App Store Connect issuer ID.
 - `ASC_PRIVATE_KEY`: contents of the `.p8` App Store Connect API private key.
+- `DIST_CERT_P12_BASE64`: base64 of your **Apple Distribution** certificate exported
+  as a `.p12` (certificate + private key).
+- `DIST_CERT_PASSWORD`: the password you set when exporting the `.p12`.
 
 The API key needs enough access to manage builds, TestFlight, and App Store
 submission. For first setup, use an Admin-capable key if possible, then narrow
 permissions after the pipeline is proven.
+
+### Why a stored certificate
+
+CI runs on ephemeral runners with an empty keychain. With automatic signing and
+`-allowProvisioningUpdates`, xcodebuild mints a **new** distribution certificate
+on every run and quickly hits the account certificate limit
+(`Your account has reached the maximum number of certificates`). Importing one
+persistent Apple Distribution certificate (via `scripts/ci/setup-signing-cert.sh`)
+makes xcodebuild reuse it; provisioning profiles stay auto-managed by the API key.
+
+### Creating the certificate secret
+
+Create the `.p12` once (reuse across all future runs):
+
+1. In Xcode or the Apple Developer portal, create/download an **Apple Distribution**
+   certificate. In Keychain Access, select the certificate **and** its private key.
+2. Right-click > **Export 2 items…** > save as `distribution.p12`, set a password.
+3. Base64-encode it and copy to your clipboard:
+
+   ```bash
+   base64 -i distribution.p12 | pbcopy
+   ```
+
+4. Paste that value into the `DIST_CERT_P12_BASE64` secret and the export password
+   into `DIST_CERT_PASSWORD`.
+
+Regenerate this only when the certificate expires (about once a year).
 
 ## Required GitHub Variables
 
@@ -94,9 +124,10 @@ Before the first successful release job:
 4. Deploy the CloudKit schema to production before broad TestFlight use.
 5. Complete App Privacy and metadata before App Store submission.
 
-The workflow uses Xcode automatic signing with the App Store Connect API key and
-`-allowProvisioningUpdates`. If automatic signing is blocked by account policy,
-switch to a stored signing-asset flow such as `asc signing sync`.
+The workflow imports one persistent Apple Distribution certificate
+(`DIST_CERT_P12_BASE64`) and then uses Xcode automatic profile management with the
+App Store Connect API key and `-allowProvisioningUpdates`. The stored certificate
+prevents CI from minting a new certificate on every run.
 
 ## Manual Runs
 
