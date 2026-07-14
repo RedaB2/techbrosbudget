@@ -151,10 +151,16 @@
     "Budget Amount" : {
 
     },
+    "Budget Chat" : {
+
+    },
     "Budget Overview" : {
 
     },
     "Categorization pending" : {
+
+    },
+    "Chat with the Tech Bro about your spending" : {
 
     },
     "Choose Amount" : {
@@ -279,10 +285,10 @@
     "Private by design: your data stays in your personal iCloud." : {
 
     },
-    "Pull to chat" : {
+    "Pull to add" : {
 
     },
-    "Pull up to open Budget Chat" : {
+    "Pull up to add an expense" : {
 
     },
     "Recent" : {

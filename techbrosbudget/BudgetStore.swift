@@ -70,7 +70,7 @@ final class BudgetStore: ObservableObject {
     }
 
     @discardableResult
-    func addExpense(amount: Decimal, note: String, date: Date? = nil, recurrence: RecurrenceFrequency? = nil) -> Expense {
+    func addExpense(amount: Decimal, note: String, date: Date? = nil, recurrence: RecurrenceFrequency? = nil, source: ExpenseSource? = nil) -> Expense {
         let expenseDate = date ?? nowProvider()
         let expense = Expense(
             amount: amount,
@@ -79,12 +79,49 @@ final class BudgetStore: ObservableObject {
             category: .awkward,
             categorizationState: .pending,
             recurrence: recurrence,
-            nextOccurrenceDate: recurrence.map { $0.nextDate(after: expenseDate, calendar: calendar) }
+            nextOccurrenceDate: recurrence.map { $0.nextDate(after: expenseDate, calendar: calendar) },
+            source: source
         )
 
         expenses.insert(expense, at: 0)
         categorizeInBackground(expense)
         return expense
+    }
+
+    /// Records an expense coming from a Shortcuts automation, skipping it when
+    /// the same purchase was already captured through another channel — e.g.
+    /// an Apple Pay tap logged by the Wallet trigger and then again by the
+    /// bank's push notification, or a purchase the user had logged by hand.
+    @discardableResult
+    func recordAutoCapturedExpense(amount: Decimal, merchant: String, source: ExpenseSource) -> AutoCaptureResult {
+        let now = nowProvider()
+
+        if let existing = expenses.first(where: { candidate in
+            candidate.amount == amount
+                && candidate.recurrence == nil
+                && abs(candidate.date.timeIntervalSince(now)) <= Self.autoCaptureDuplicateWindow
+        }) {
+            // A structured merchant name beats a placeholder note left by an
+            // earlier capture that couldn't identify the merchant.
+            if existing.note.isEmpty || existing.note == "Expense",
+               let index = expenses.firstIndex(where: { $0.id == existing.id }) {
+                expenses[index].note = merchant
+                categorizeInBackground(expenses[index])
+                return AutoCaptureResult(expense: expenses[index], isDuplicate: true)
+            }
+            return AutoCaptureResult(expense: existing, isDuplicate: true)
+        }
+
+        let expense = addExpense(amount: amount, note: merchant, source: source)
+        return AutoCaptureResult(expense: expense, isDuplicate: false)
+    }
+
+    /// Bank pushes can lag an Apple Pay tap by a couple of minutes.
+    static let autoCaptureDuplicateWindow: TimeInterval = 5 * 60
+
+    struct AutoCaptureResult {
+        let expense: Expense
+        let isDuplicate: Bool
     }
 
     func removeExpense(_ expense: Expense) {

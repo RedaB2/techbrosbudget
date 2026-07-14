@@ -21,19 +21,28 @@ struct ContentView: View {
     @StateObject private var store: BudgetStore
     @State private var isAddingExpense = false
     @State private var isShowingSettings = false
-    @State private var isShowingChat = opensBudgetChatForUITests()
     @State private var expandedPeriod: BudgetPeriod?
     @State private var bottomOverscroll: CGFloat = 0
     @StateObject private var moneyRain = MoneyRainSimulator()
     @State private var vaultProgress: CGFloat = 0
     @State private var isVaultOpen = false
+    @State private var chatProgress: CGFloat = opensBudgetChatForUITests() ? 1 : 0
+    @State private var isChatOpen = opensBudgetChatForUITests()
+    /// Keeps the chat panel in the hierarchy until its slide-out finishes, so
+    /// closing animates instead of the panel vanishing when progress hits 0.
+    @State private var isChatMounted = opensBudgetChatForUITests()
+    @State private var containerWidth: CGFloat = 0
     @State private var logoCenter: CGPoint = .zero
     /// Highest logged-expense milestone already celebrated with money rain,
     /// so each milestone rains exactly once per device.
     @AppStorage("celebratedExpenseMilestone") private var celebratedExpenseMilestone = 0
 
-    /// How far a drag must travel to fully reveal the vault.
-    private static let vaultRevealDistance: CGFloat = 320
+    /// How far a drag must travel to fully reveal a side panel (vault or chat).
+    private static let panelRevealDistance: CGFloat = 320
+
+    /// Chat opens only from drags starting this close to the trailing edge, so
+    /// leftward swipes on expense rows keep revealing the delete action.
+    private static let chatEdgeWidth: CGFloat = 36
 
     @MainActor
     init(store: BudgetStore? = nil) {
@@ -50,6 +59,7 @@ struct ContentView: View {
                         MonolithHeader(
                             onSettings: { isShowingSettings = true },
                             onVault: { setVault(open: true) },
+                            onChat: { setChat(open: true) },
                             onLogoTap: { logoCenter in
                                 moneyRain.burst(from: logoCenter)
                             },
@@ -64,7 +74,7 @@ struct ContentView: View {
                         RecentSection(store: store)
                             .padding(.top, 44)
 
-                        ChatPullAffordance(overscroll: bottomOverscroll)
+                        AddExpensePullAffordance(overscroll: bottomOverscroll)
                             .padding(.top, 28)
                     }
                     .padding(.horizontal, 28)
@@ -75,8 +85,8 @@ struct ContentView: View {
                     max(0, geo.contentOffset.y + geo.containerSize.height - geo.contentSize.height)
                 } action: { _, overscroll in
                     bottomOverscroll = overscroll
-                    if overscroll > 80 && !isShowingChat {
-                        isShowingChat = true
+                    if overscroll > 80 && !isAddingExpense {
+                        isAddingExpense = true
                     }
                 }
 
@@ -93,11 +103,22 @@ struct ContentView: View {
 
                 vaultLayer
 
+                if isChatMounted || chatProgress > 0 {
+                    chatLayer
+                }
+
                 MoneyRainOverlay(simulator: moneyRain)
             }
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.width
+            } action: { width in
+                containerWidth = width
+            }
             .simultaneousGesture(vaultOpenGesture)
+            .simultaneousGesture(chatOpenGesture)
             .sensoryFeedback(.impact(weight: .light), trigger: expandedPeriod)
             .sensoryFeedback(.impact(weight: .medium), trigger: isVaultOpen)
+            .sensoryFeedback(.impact(weight: .medium), trigger: isChatOpen)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $isAddingExpense) {
@@ -108,11 +129,6 @@ struct ContentView: View {
             .sheet(isPresented: $isShowingSettings) {
                 SettingsView(store: store)
                     .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-            }
-            .sheet(isPresented: $isShowingChat) {
-                BudgetChatView(store: store)
-                    .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
             .navigationDestination(for: BudgetPeriod.self) { period in
@@ -159,21 +175,21 @@ struct ContentView: View {
     private var vaultOpenGesture: some Gesture {
         DragGesture(minimumDistance: 25)
             .onChanged { value in
-                guard !isVaultOpen else { return }
+                guard !isVaultOpen, !isChatOpen else { return }
 
                 let translation = value.translation
                 guard translation.width > 0, abs(translation.width) > abs(translation.height) else {
                     return
                 }
 
-                vaultProgress = min(1, translation.width / Self.vaultRevealDistance)
+                vaultProgress = min(1, translation.width / Self.panelRevealDistance)
             }
             .onEnded { value in
-                guard !isVaultOpen else { return }
+                guard !isVaultOpen, !isChatOpen else { return }
                 guard vaultProgress > 0 else { return }
 
                 let opens = vaultProgress > 0.35
-                    || value.predictedEndTranslation.width > Self.vaultRevealDistance
+                    || value.predictedEndTranslation.width > Self.panelRevealDistance
                 setVault(open: opens)
             }
     }
@@ -188,13 +204,13 @@ struct ContentView: View {
                     return
                 }
 
-                vaultProgress = max(0, 1 + translation.width / Self.vaultRevealDistance)
+                vaultProgress = max(0, 1 + translation.width / Self.panelRevealDistance)
             }
             .onEnded { value in
                 guard isVaultOpen else { return }
 
                 let closes = vaultProgress < 0.65
-                    || value.predictedEndTranslation.width < -Self.vaultRevealDistance
+                    || value.predictedEndTranslation.width < -Self.panelRevealDistance
                 setVault(open: !closes)
             }
     }
@@ -204,6 +220,88 @@ struct ContentView: View {
             vaultProgress = open ? 1 : 0
         }
         isVaultOpen = open
+    }
+
+    // MARK: - Chat
+
+    /// Budget Chat mirrors the vault on the opposite side: it sits offscreen to
+    /// the right and tracks the finger during an edge swipe from the trailing
+    /// edge. Mounted lazily so each open starts a fresh chat session, exactly
+    /// like the old sheet presentation did.
+    private var chatLayer: some View {
+        GeometryReader { geo in
+            BudgetChatView(store: store) {
+                setChat(open: false)
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .overlay(alignment: .leading) {
+                Rectangle()
+                    .fill(Monolith.hairline)
+                    .frame(width: 1)
+                    .ignoresSafeArea()
+            }
+            .offset(x: (1 - chatProgress) * geo.size.width)
+            .simultaneousGesture(chatCloseGesture)
+        }
+        .accessibilityHidden(chatProgress < 1)
+    }
+
+    private var chatOpenGesture: some Gesture {
+        DragGesture(minimumDistance: 25)
+            .onChanged { value in
+                guard !isChatOpen, !isVaultOpen else { return }
+                guard value.startLocation.x > containerWidth - Self.chatEdgeWidth else { return }
+
+                let translation = value.translation
+                guard translation.width < 0, abs(translation.width) > abs(translation.height) else {
+                    return
+                }
+
+                chatProgress = min(1, -translation.width / Self.panelRevealDistance)
+            }
+            .onEnded { value in
+                guard !isChatOpen, !isVaultOpen else { return }
+                guard chatProgress > 0 else { return }
+
+                let opens = chatProgress > 0.35
+                    || value.predictedEndTranslation.width < -Self.panelRevealDistance
+                setChat(open: opens)
+            }
+    }
+
+    private var chatCloseGesture: some Gesture {
+        DragGesture(minimumDistance: 25)
+            .onChanged { value in
+                guard isChatOpen else { return }
+
+                let translation = value.translation
+                guard translation.width > 0, abs(translation.width) > abs(translation.height) else {
+                    return
+                }
+
+                chatProgress = max(0, 1 - translation.width / Self.panelRevealDistance)
+            }
+            .onEnded { value in
+                guard isChatOpen else { return }
+
+                let closes = chatProgress < 0.65
+                    || value.predictedEndTranslation.width > Self.panelRevealDistance
+                setChat(open: !closes)
+            }
+    }
+
+    private func setChat(open: Bool) {
+        if open {
+            isChatMounted = true
+        }
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.86)) {
+            chatProgress = open ? 1 : 0
+        } completion: {
+            if chatProgress == 0 {
+                isChatMounted = false
+            }
+        }
+        isChatOpen = open
     }
 
     // MARK: - Milestones
@@ -236,6 +334,7 @@ struct ContentView: View {
 private struct MonolithHeader: View {
     let onSettings: () -> Void
     let onVault: () -> Void
+    let onChat: () -> Void
     let onLogoTap: (CGPoint) -> Void
     let onLogoMoved: (CGPoint) -> Void
 
@@ -290,6 +389,10 @@ private struct MonolithHeader: View {
                     .accessibilityHint("Shows your logging record and minted monoliths")
 
                 Spacer()
+
+                MonolithIconButton(systemName: "bubble.left", action: onChat)
+                    .accessibilityLabel("Budget Chat")
+                    .accessibilityHint("Chat with the Tech Bro about your spending")
 
                 MonolithIconButton(systemName: "gearshape", action: onSettings)
                     .accessibilityLabel("Settings")
@@ -574,6 +677,12 @@ private struct ExpenseRow: View {
                         Image(systemName: "repeat")
                             .font(.system(size: 8, weight: .semibold))
                             .accessibilityLabel("Recurring")
+                    }
+
+                    if expense.isAutoCaptured {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 8, weight: .semibold))
+                            .accessibilityLabel("Logged automatically")
                     }
 
                     if expense.categorizationState == .pending {
@@ -865,6 +974,32 @@ private struct SettingsView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(Monolith.tertiary)
                             .padding(.top, 12)
+
+                        MonolithDivider()
+                            .padding(.vertical, 26)
+
+                        MonolithLabel("Auto-Capture")
+                            .padding(.bottom, 14)
+
+                        NavigationLink {
+                            AutoCaptureSetupView()
+                        } label: {
+                            HStack(spacing: 12) {
+                                SettingsStatusRow(
+                                    icon: "bolt",
+                                    iconTint: Monolith.secondary,
+                                    title: "Log card purchases automatically",
+                                    detail: "A one-time Shortcuts setup captures Apple Pay taps — and, on iOS 27, bank notifications too.",
+                                    showsProgress: false
+                                )
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(Monolith.tertiary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
 
                         MonolithDivider()
                             .padding(.vertical, 26)
@@ -1296,9 +1431,9 @@ private struct AddExpenseView: View {
     }
 }
 
-// MARK: - Chat pull affordance
+// MARK: - Add expense pull affordance
 
-private struct ChatPullAffordance: View {
+private struct AddExpensePullAffordance: View {
     let overscroll: CGFloat
 
     private var progress: CGFloat {
@@ -1313,8 +1448,8 @@ private struct ChatPullAffordance: View {
                 .scaleEffect(0.8 + progress * 0.3)
                 .offset(y: -progress * 6)
 
-            MonolithLabel("Pull to chat", size: 9, color: Monolith.tertiary)
-                .accessibilityLabel("Pull to chat")
+            MonolithLabel("Pull to add", size: 9, color: Monolith.tertiary)
+                .accessibilityLabel("Pull to add")
                 .opacity(0.6 + progress * 0.4)
         }
         .frame(maxWidth: .infinity)
@@ -1322,7 +1457,7 @@ private struct ChatPullAffordance: View {
         .padding(.bottom, 10)
         .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7), value: overscroll)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Pull up to open Budget Chat")
+        .accessibilityLabel("Pull up to add an expense")
     }
 }
 

@@ -183,15 +183,9 @@ final class techbrosbudgetUITests: XCTestCase {
             return
         }
 
-        for _ in 0..<5 where !app.staticTexts["Pull to chat"].exists {
-            app.swipeUp()
-        }
-
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.88))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.14))
-
+        let chatButton = app.buttons["Budget Chat"]
         for _ in 0..<3 where !app.staticTexts["Tech Bro"].exists {
-            start.press(forDuration: 0.05, thenDragTo: end)
+            chatButton.tap()
             Thread.sleep(forTimeInterval: 0.5)
         }
     }

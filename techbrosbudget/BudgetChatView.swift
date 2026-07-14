@@ -11,6 +11,9 @@ private let kInputHeight: CGFloat = 44
 
 struct BudgetChatView: View {
     let store: BudgetStore
+    /// Set when the chat is embedded as a panel instead of presented as a
+    /// sheet, where the dismiss environment action has no effect.
+    var onClose: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var session = BudgetChatSession()
     @State private var inputText = ""
@@ -47,7 +50,13 @@ struct BudgetChatView: View {
 
             Spacer()
 
-            Button { dismiss() } label: {
+            Button {
+                if let onClose {
+                    onClose()
+                } else {
+                    dismiss()
+                }
+            } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 13, weight: .light))
                     .foregroundStyle(Monolith.secondary)

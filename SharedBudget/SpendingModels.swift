@@ -183,6 +183,19 @@ enum CategorizationState: String, Codable {
     case needsReview
 }
 
+/// How an expense entered the ledger. Raw values are persisted (SwiftData,
+/// widget snapshots) and referenced by deployed Shortcuts automations — never
+/// rename a case.
+enum ExpenseSource: String, Codable {
+    case manual
+    case walletAutomation
+    case notificationAutomation
+
+    var isAutomatic: Bool {
+        self != .manual
+    }
+}
+
 enum RecurrenceFrequency: String, CaseIterable, Codable, Identifiable {
     case weekly
     case monthly
@@ -252,6 +265,8 @@ struct Expense: Identifiable, Codable, Equatable {
     var recurrence: RecurrenceFrequency?
     var nextOccurrenceDate: Date?
     var recurringSourceID: UUID?
+    // Optional so ledgers persisted before auto-capture existed still decode.
+    var source: ExpenseSource?
 
     init(
         id: UUID = UUID(),
@@ -262,7 +277,8 @@ struct Expense: Identifiable, Codable, Equatable {
         categorizationState: CategorizationState = .pending,
         recurrence: RecurrenceFrequency? = nil,
         nextOccurrenceDate: Date? = nil,
-        recurringSourceID: UUID? = nil
+        recurringSourceID: UUID? = nil,
+        source: ExpenseSource? = nil
     ) {
         self.id = id
         self.amount = amount
@@ -273,10 +289,15 @@ struct Expense: Identifiable, Codable, Equatable {
         self.recurrence = recurrence
         self.nextOccurrenceDate = nextOccurrenceDate
         self.recurringSourceID = recurringSourceID
+        self.source = source
     }
 
     var isRecurring: Bool {
         recurrence != nil || recurringSourceID != nil
+    }
+
+    var isAutoCaptured: Bool {
+        source?.isAutomatic == true
     }
 }
 
