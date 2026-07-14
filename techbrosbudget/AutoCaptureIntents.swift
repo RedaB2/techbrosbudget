@@ -26,8 +26,8 @@ struct LogWalletTransactionIntent: AppIntent {
 
     static var description: IntentDescription? {
         IntentDescription(
-            "Logs an Apple Pay purchase in Tech Bros Budget. Attach it to a Shortcuts Wallet automation and pass the transaction's amount and merchant.",
-            searchKeywords: ["spending", "budget", "transaction", "apple pay", "automatic"]
+            "Logs a tap-to-pay purchase in Tech Bros Budget. Attach it to a Shortcuts Wallet automation and pass the transaction's amount and merchant.",
+            searchKeywords: ["spending", "budget", "transaction", "tap to pay", "automatic"]
         )
     }
 
