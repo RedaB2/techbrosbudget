@@ -65,7 +65,9 @@ private struct RootView: View {
                 }
                 .transition(.move(edge: .leading).combined(with: .opacity))
             } else {
-                ContentView(store: launchStore)
+                // Automated runs skip the auto-capture popup too, unless a UI
+                // test opts in with UITEST_SHOW_AUTOCAPTURE_INTRO.
+                ContentView(store: launchStore, autoCaptureIntroEnabled: !skipsOnboarding)
             }
         }
         .animation(.easeInOut(duration: 0.35), value: showsOnboarding)

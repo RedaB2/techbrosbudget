@@ -16,6 +16,14 @@ private func opensBudgetChatForUITests() -> Bool {
     #endif
 }
 
+private func forcesAutoCaptureIntroForUITests() -> Bool {
+    #if DEBUG
+    ProcessInfo.processInfo.arguments.contains("UITEST_SHOW_AUTOCAPTURE_INTRO")
+    #else
+    false
+    #endif
+}
+
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var store: BudgetStore
@@ -36,6 +44,11 @@ struct ContentView: View {
     /// Highest logged-expense milestone already celebrated with money rain,
     /// so each milestone rains exactly once per device.
     @AppStorage("celebratedExpenseMilestone") private var celebratedExpenseMilestone = 0
+    @AppStorage(AutoCaptureEnrollment.introSeenDefaultsKey) private var hasSeenAutoCaptureIntro = false
+    @State private var isShowingAutoCaptureIntro = false
+    /// Off for automated runs so the popup never races UI tests that don't
+    /// opt in via UITEST_SHOW_AUTOCAPTURE_INTRO.
+    private let autoCaptureIntroEnabled: Bool
 
     /// How far a drag must travel to fully reveal a side panel (vault or chat).
     private static let panelRevealDistance: CGFloat = 320
@@ -45,8 +58,9 @@ struct ContentView: View {
     private static let chatEdgeWidth: CGFloat = 36
 
     @MainActor
-    init(store: BudgetStore? = nil) {
+    init(store: BudgetStore? = nil, autoCaptureIntroEnabled: Bool = true) {
         _store = StateObject(wrappedValue: store ?? BudgetStore())
+        self.autoCaptureIntroEnabled = autoCaptureIntroEnabled
     }
 
     var body: some View {
@@ -134,8 +148,17 @@ struct ContentView: View {
             .navigationDestination(for: BudgetPeriod.self) { period in
                 PeriodDetailView(store: store, period: period)
             }
+            .fullScreenCover(isPresented: $isShowingAutoCaptureIntro) {
+                AutoCaptureOnboardingView(store: store) {
+                    hasSeenAutoCaptureIntro = true
+                    isShowingAutoCaptureIntro = false
+                }
+            }
             .onAppear {
                 store.reloadPersistedData()
+            }
+            .task {
+                await presentAutoCaptureIntroIfEligible()
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
@@ -302,6 +325,32 @@ struct ContentView: View {
             }
         }
         isChatOpen = open
+    }
+
+    // MARK: - Auto-capture intro
+
+    /// Pops the auto-capture walkthrough once, shortly after launch, for any
+    /// user who isn't capturing yet — new users right after the welcome
+    /// screen, existing users on their next launch.
+    private func presentAutoCaptureIntroIfEligible() async {
+        let isCapturing = store.hasAutoCapturedExpenses || AutoCaptureEnrollment.hasEverCaptured()
+        let isEligible = autoCaptureIntroEnabled && AutoCaptureEnrollment.shouldPresentIntro(
+            hasSeenIntro: hasSeenAutoCaptureIntro,
+            isCapturing: isCapturing
+        )
+
+        guard forcesAutoCaptureIntroForUITests() || isEligible else {
+            return
+        }
+
+        // Let the home screen render first so dismissing lands somewhere familiar.
+        try? await Task.sleep(for: .seconds(0.7))
+
+        guard !Task.isCancelled else {
+            return
+        }
+
+        isShowingAutoCaptureIntro = true
     }
 
     // MARK: - Milestones
@@ -918,8 +967,14 @@ private struct SettingsView: View {
     @ObservedObject var store: BudgetStore
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppearanceSetting.storageKey) private var appearanceRawValue = AppearanceSetting.system.rawValue
+    @AppStorage(AutoCaptureEnrollment.introSeenDefaultsKey) private var hasSeenAutoCaptureIntro = false
     @State private var intelligenceSummary = AppleIntelligenceSpendingCategorizer.availabilitySummary()
     @State private var iCloudAccountStatus = ICloudAccountStatus.checking
+    @State private var isShowingAutoCaptureSetup = false
+
+    private var isAutoCapturing: Bool {
+        store.hasAutoCapturedExpenses || AutoCaptureEnrollment.hasEverCaptured()
+    }
 
     private var appearanceSelection: Binding<AppearanceSetting> {
         Binding(
@@ -981,25 +1036,33 @@ private struct SettingsView: View {
                         MonolithLabel("Auto-Capture")
                             .padding(.bottom, 14)
 
-                        NavigationLink {
-                            AutoCaptureSetupView()
-                        } label: {
-                            HStack(spacing: 12) {
-                                SettingsStatusRow(
-                                    icon: "bolt",
-                                    iconTint: Monolith.secondary,
-                                    title: "Log card purchases automatically",
-                                    detail: "A one-time Shortcuts setup captures Apple Pay taps — and, on iOS 27, bank notifications too.",
-                                    showsProgress: false
-                                )
+                        SettingsStatusRow(
+                            icon: isAutoCapturing ? "bolt.fill" : "bolt",
+                            iconTint: Monolith.secondary,
+                            title: isAutoCapturing ? "On — purchases log themselves" : "Let purchases log themselves",
+                            detail: isAutoCapturing
+                                ? "Auto-captured expenses show a bolt in Recent."
+                                : "Pay with your card and the expense just appears.",
+                            showsProgress: false
+                        )
 
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(Monolith.tertiary)
-                            }
-                            .contentShape(Rectangle())
+                        Button {
+                            isShowingAutoCaptureSetup = true
+                        } label: {
+                            Text(isAutoCapturing ? "View Setup" : "Set Up in One Minute")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(Monolith.primary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(Monolith.hairline)
+                                )
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityIdentifier("AutoCaptureSettingsSetup")
+                        .padding(.top, 14)
 
                         MonolithDivider()
                             .padding(.vertical, 26)
@@ -1041,6 +1104,12 @@ private struct SettingsView: View {
             }
             .task {
                 await refreshICloudAccountStatus()
+            }
+            .fullScreenCover(isPresented: $isShowingAutoCaptureSetup) {
+                AutoCaptureOnboardingView(store: store) {
+                    hasSeenAutoCaptureIntro = true
+                    isShowingAutoCaptureSetup = false
+                }
             }
         }
         // A sheet is its own presentation, so the scheme set at the app root

@@ -142,6 +142,9 @@ enum AutoCaptureRecorder {
                 source: source
             )
 
+            // The first successful capture ends the setup nudges for good.
+            AutoCaptureEnrollment.markCaptured()
+
             return AutoCaptureRecord(
                 formattedAmount: MoneyFormatter.currency(amount),
                 merchant: normalizedMerchant,

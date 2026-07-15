@@ -119,6 +119,48 @@ struct TransactionNotificationHeuristicsTests {
     }
 }
 
+struct AutoCaptureEnrollmentTests {
+    @Test func introPopsOnlyForUnenrolledUsersWhoHaventSeenIt() {
+        #expect(AutoCaptureEnrollment.shouldPresentIntro(hasSeenIntro: false, isCapturing: false))
+        #expect(!AutoCaptureEnrollment.shouldPresentIntro(hasSeenIntro: true, isCapturing: false))
+        #expect(!AutoCaptureEnrollment.shouldPresentIntro(hasSeenIntro: false, isCapturing: true))
+        #expect(!AutoCaptureEnrollment.shouldPresentIntro(hasSeenIntro: true, isCapturing: true))
+    }
+
+    @Test func firstCaptureIsRecordedOnceAndKeepsItsDate() throws {
+        let suiteName = "AutoCaptureEnrollmentTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(!AutoCaptureEnrollment.hasEverCaptured(in: defaults))
+
+        AutoCaptureEnrollment.markCaptured(in: defaults)
+        #expect(AutoCaptureEnrollment.hasEverCaptured(in: defaults))
+
+        let firstDate = try #require(defaults.object(forKey: AutoCaptureEnrollment.firstCaptureDefaultsKey) as? Date)
+
+        AutoCaptureEnrollment.markCaptured(in: defaults)
+        #expect(defaults.object(forKey: AutoCaptureEnrollment.firstCaptureDefaultsKey) as? Date == firstDate)
+    }
+
+    @Test @MainActor func storeReportsWhenLedgerHoldsAutoCapturedExpenses() {
+        let store = BudgetStore(
+            categorizer: AutoCaptureStubCategorizer(),
+            persistence: AutoCaptureInMemoryPersistence(),
+            updatesWidgets: false,
+            nowProvider: { Date(timeIntervalSince1970: 1_000_000) }
+        )
+
+        #expect(!store.hasAutoCapturedExpenses)
+
+        store.addExpense(amount: 5, note: "coffee")
+        #expect(!store.hasAutoCapturedExpenses)
+
+        store.recordAutoCapturedExpense(amount: 6.50, merchant: "Blue Bottle", source: .walletAutomation)
+        #expect(store.hasAutoCapturedExpenses)
+    }
+}
+
 struct AutoCaptureDedupTests {
     @Test @MainActor func autoCapturedExpenseCarriesItsSource() {
         let store = makeStore(now: Date(timeIntervalSince1970: 1_000_000))

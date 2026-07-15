@@ -119,6 +119,12 @@ final class BudgetStore: ObservableObject {
     /// Bank pushes can lag an Apple Pay tap by a couple of minutes.
     static let autoCaptureDuplicateWindow: TimeInterval = 5 * 60
 
+    /// Whether any expense in the ledger arrived through an automation. Also
+    /// covers automations set up on another device, since expenses sync.
+    var hasAutoCapturedExpenses: Bool {
+        expenses.contains { $0.isAutoCaptured }
+    }
+
     struct AutoCaptureResult {
         let expense: Expense
         let isDuplicate: Bool

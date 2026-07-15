@@ -43,9 +43,9 @@ final class techbrosbudgetUITests: XCTestCase {
     }
 
     @MainActor
-    func testOnboardingWelcomesNewUsersAndContinuesToHome() throws {
+    func testOnboardingWelcomesNewUsersThenOffersAutoCapture() throws {
         let app = XCUIApplication()
-        app.launchArguments.append("UITEST_SHOW_ONBOARDING")
+        app.launchArguments += ["UITEST_SHOW_ONBOARDING", "UITEST_SHOW_AUTOCAPTURE_INTRO"]
         app.launch()
 
         XCTAssertTrue(app.images["Tech Bros logo"].waitForExistence(timeout: 5))
@@ -59,11 +59,71 @@ final class techbrosbudgetUITests: XCTestCase {
 
         continueButton.tap()
 
+        // The auto-capture intro babysits new users right after the welcome
+        // screen; declining it lands on the home screen.
+        let setItUp = app.buttons["AutoCaptureSetItUp"]
+        XCTAssertTrue(setItUp.waitForExistence(timeout: 8))
+
+        let introAttachment = XCTAttachment(screenshot: app.screenshot())
+        introAttachment.name = "Auto-capture intro after onboarding"
+        introAttachment.lifetime = .keepAlways
+        add(introAttachment)
+
+        app.buttons["AutoCaptureMaybeLater"].tap()
+
         XCTAssertTrue(app.staticTexts["Month"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.buttons["Add expense"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.staticTexts["Tech Bro"].waitForExistence(timeout: 1))
-        XCTAssertFalse(app.buttons["Close"].waitForExistence(timeout: 1))
         XCTAssertFalse(continueButton.exists)
+    }
+
+    @MainActor
+    func testAutoCaptureIntroWalksThroughSetup() throws {
+        let app = makePreviewApp()
+        app.launchArguments.append("UITEST_SHOW_AUTOCAPTURE_INTRO")
+        app.launch()
+
+        // The pitch pops on its own shortly after launch.
+        let setItUp = app.buttons["AutoCaptureSetItUp"]
+        XCTAssertTrue(setItUp.waitForExistence(timeout: 8))
+
+        let pitchAttachment = XCTAttachment(screenshot: app.screenshot())
+        pitchAttachment.name = "Auto-capture pitch"
+        pitchAttachment.lifetime = .keepAlways
+        add(pitchAttachment)
+
+        setItUp.tap()
+
+        // Guided steps: exact Shortcuts labels are shown as chips.
+        XCTAssertTrue(app.buttons["AutoCaptureOpenShortcuts"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Transaction"].exists)
+        XCTAssertTrue(app.staticTexts["Run Immediately"].exists)
+        XCTAssertTrue(app.staticTexts["Log Wallet Transaction"].exists)
+
+        let stepsAttachment = XCTAttachment(screenshot: app.screenshot())
+        stepsAttachment.name = "Auto-capture guided steps"
+        stepsAttachment.lifetime = .keepAlways
+        add(stepsAttachment)
+
+        app.buttons["AutoCaptureStepsDone"].tap()
+
+        let done = app.buttons["AutoCaptureDone"]
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
+
+        let finishAttachment = XCTAttachment(screenshot: app.screenshot())
+        finishAttachment.name = "Auto-capture finish"
+        finishAttachment.lifetime = .keepAlways
+        add(finishAttachment)
+
+        done.tap()
+
+        XCTAssertTrue(app.buttons["Add expense"].waitForExistence(timeout: 5))
+
+        // Settings now shows the slim status row with a single setup button.
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Auto-Capture"].exists)
+        XCTAssertTrue(app.buttons["AutoCaptureSettingsSetup"].exists)
     }
 
     @MainActor
