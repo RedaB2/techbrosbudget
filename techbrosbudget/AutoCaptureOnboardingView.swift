@@ -12,6 +12,99 @@
 //
 
 import SwiftUI
+import UIKit
+
+// MARK: - Bundled ready-made shortcuts
+
+/// The pre-wired shortcut files shipped in the app bundle (generated and
+/// signed by scripts/make_auto_capture_shortcuts.py). Users import one with
+/// a single tap, so the Shortcuts automation setup needs zero wiring — the
+/// automation just runs the imported shortcut.
+enum AutoCaptureShortcut {
+    case wallet
+    case notification
+
+    /// Must match WFWorkflowName in the generator script — it's the name
+    /// users see in the Shortcuts automation picker.
+    var title: String {
+        switch self {
+        case .wallet:
+            return "Log My Purchase"
+        case .notification:
+            return "Log Bank Alert"
+        }
+    }
+
+    /// Also the bundled file's base name — Shortcuts names an imported
+    /// shortcut after the file, so the file name must match the title.
+    private var resourceName: String {
+        title
+    }
+
+    var fileURL: URL? {
+        Bundle.main.url(forResource: resourceName, withExtension: "shortcut")
+    }
+}
+
+/// Invisible anchor that presents the system "open in" menu for a shortcut
+/// file when `isPresenting` flips true, and reports when the menu closes so
+/// the wizard can advance on its own.
+private struct ShortcutOpenInAnchor: UIViewRepresentable {
+    @Binding var isPresenting: Bool
+    let fileURL: URL
+    let onDismiss: () -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        UIView(frame: .zero)
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        context.coordinator.parent = self
+
+        guard isPresenting, context.coordinator.controller == nil else {
+            return
+        }
+
+        let controller = UIDocumentInteractionController(url: fileURL)
+        controller.delegate = context.coordinator
+        context.coordinator.controller = controller
+
+        DispatchQueue.main.async {
+            let presented = controller.presentOpenInMenu(
+                from: view.bounds.insetBy(dx: -22, dy: -22),
+                in: view,
+                animated: true
+            )
+
+            if !presented {
+                context.coordinator.finish()
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    final class Coordinator: NSObject, UIDocumentInteractionControllerDelegate {
+        var parent: ShortcutOpenInAnchor
+        var controller: UIDocumentInteractionController?
+
+        init(parent: ShortcutOpenInAnchor) {
+            self.parent = parent
+        }
+
+        func documentInteractionControllerDidDismissOpenInMenu(_ controller: UIDocumentInteractionController) {
+            finish()
+        }
+
+        func finish() {
+            controller = nil
+            parent.isPresenting = false
+            parent.onDismiss()
+        }
+    }
+}
 
 // MARK: - Enrollment state
 
@@ -55,10 +148,13 @@ struct AutoCaptureOnboardingView: View {
     @AppStorage(AppearanceSetting.storageKey) private var appearanceRawValue = AppearanceSetting.system.rawValue
     @State private var stage = Stage.pitch
     @State private var completedNotificationSteps = false
+    @State private var isPresentingShortcutFile = false
 
     private enum Stage {
         case pitch
+        case walletAddShortcut
         case walletSteps
+        case notificationAddShortcut
         case notificationSteps
         case finish
     }
@@ -92,12 +188,29 @@ struct AutoCaptureOnboardingView: View {
                 case .pitch:
                     pitchPage
                         .transition(pageTransition)
+                case .walletAddShortcut:
+                    addShortcutPage(
+                        label: "One-Minute Setup",
+                        shortcut: .wallet,
+                        chipIcon: "bolt.fill",
+                        next: .walletSteps
+                    )
+                    .transition(pageTransition)
                 case .walletSteps:
                     stepsPage(
                         label: "One-Minute Setup",
                         title: "Four taps\nin Shortcuts.",
                         steps: Self.walletSteps,
-                        footnote: "If Shortcuts asks what to log, pick the transaction's Amount and Merchant."
+                        footnote: "The shortcut is pre-wired — there's nothing to configure.",
+                        addStage: .walletAddShortcut
+                    )
+                    .transition(pageTransition)
+                case .notificationAddShortcut:
+                    addShortcutPage(
+                        label: "Level Up",
+                        shortcut: .notification,
+                        chipIcon: "bell.badge",
+                        next: .notificationSteps
                     )
                     .transition(pageTransition)
                 case .notificationSteps:
@@ -105,7 +218,8 @@ struct AutoCaptureOnboardingView: View {
                         label: "Level Up",
                         title: "Catch every\ncard purchase.",
                         steps: Self.notificationSteps,
-                        footnote: "Needs purchase alerts turned on in your bank's app. iOS flashes a brief banner each time — that means it's working."
+                        footnote: "Needs purchase alerts turned on in your bank's app. iOS flashes a brief banner each time — that means it's working.",
+                        addStage: .notificationAddShortcut
                     )
                     .transition(pageTransition)
                 case .finish:
@@ -170,7 +284,7 @@ struct AutoCaptureOnboardingView: View {
             Spacer()
 
             Button {
-                advance(to: .walletSteps)
+                advance(to: .walletAddShortcut)
             } label: {
                 Text("Set It Up")
             }
@@ -195,23 +309,115 @@ struct AutoCaptureOnboardingView: View {
         .padding(.bottom, 20)
     }
 
+    // MARK: Add the ready-made shortcut
+
+    /// One tap imports the pre-wired shortcut; when the system menu closes,
+    /// the wizard moves to the automation steps on its own.
+    private func addShortcutPage(label: String, shortcut: AutoCaptureShortcut, chipIcon: String, next: Stage) -> some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            MonolithLabel(label)
+
+            Text("First, add the\nready-made shortcut.")
+                .font(.system(size: 30, weight: .ultraLight))
+                .foregroundStyle(Monolith.primary)
+                .multilineTextAlignment(.center)
+                .padding(.top, 14)
+
+            HStack(spacing: 8) {
+                Image(systemName: chipIcon)
+                    .font(.system(size: 14, weight: .medium))
+                    .accessibilityHidden(true)
+
+                Text(shortcut.title)
+                    .font(.system(size: 16, weight: .medium))
+            }
+            .foregroundStyle(Monolith.primary)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 13)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Monolith.ring)
+            )
+            .padding(.top, 28)
+
+            Text("It comes pre-wired — you'll never touch a setting.")
+                .font(.system(size: 13))
+                .foregroundStyle(Monolith.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 20)
+                .padding(.horizontal, 48)
+
+            Text("Tap below, choose Shortcuts, then Add Shortcut.")
+                .font(.system(size: 12))
+                .foregroundStyle(Monolith.tertiary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 10)
+                .padding(.horizontal, 48)
+
+            Spacer()
+
+            Button {
+                if shortcut.fileURL != nil {
+                    isPresentingShortcutFile = true
+                } else {
+                    // The bundled file is missing — don't strand the user.
+                    advance(to: next)
+                }
+            } label: {
+                Text("Add the Shortcut")
+            }
+            .buttonStyle(MonolithBlockButtonStyle())
+            .accessibilityIdentifier("AutoCaptureAddShortcut")
+            .padding(.horizontal, 28)
+            .background {
+                if let fileURL = shortcut.fileURL {
+                    ShortcutOpenInAnchor(
+                        isPresenting: $isPresentingShortcutFile,
+                        fileURL: fileURL
+                    ) {
+                        advance(to: next)
+                    }
+                }
+            }
+
+            Button {
+                advance(to: next)
+            } label: {
+                Text("Continue")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Monolith.secondary)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 20)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("AutoCaptureContinueToSteps")
+            .padding(.top, 8)
+        }
+        .padding(.bottom, 20)
+    }
+
     // MARK: Steps
 
     private static let walletSteps: [GuidedStep] = [
-        GuidedStep(number: 1, instruction: "Open Shortcuts and tap", chipIcon: "clock.arrow.2.circlepath", chipText: "Automation"),
-        GuidedStep(number: 2, instruction: "Tap + and choose the trigger", chipIcon: "creditcard", chipText: "Transaction"),
+        GuidedStep(number: 1, instruction: "In Shortcuts, open the tab", chipIcon: "clock.arrow.2.circlepath", chipText: "Automation"),
+        GuidedStep(number: 2, instruction: "Tap + and choose the trigger", chipIcon: "creditcard", chipText: "Wallet"),
         GuidedStep(number: 3, instruction: "Pick your cards, then select", chipIcon: nil, chipText: "Run Immediately"),
-        GuidedStep(number: 4, instruction: "Search Tech Bros and add", chipIcon: "bolt.fill", chipText: "Log Wallet Transaction")
+        GuidedStep(number: 4, instruction: "Choose your new shortcut", chipIcon: "bolt.fill", chipText: "Log My Purchase")
     ]
 
     private static let notificationSteps: [GuidedStep] = [
-        GuidedStep(number: 1, instruction: "Open Shortcuts and tap", chipIcon: "clock.arrow.2.circlepath", chipText: "Automation"),
+        GuidedStep(number: 1, instruction: "In Shortcuts, open the tab", chipIcon: "clock.arrow.2.circlepath", chipText: "Automation"),
         GuidedStep(number: 2, instruction: "Tap + and choose the trigger", chipIcon: "bell.badge", chipText: "Notification"),
         GuidedStep(number: 3, instruction: "Pick Wallet or your bank's app, then select", chipIcon: nil, chipText: "Run Immediately"),
-        GuidedStep(number: 4, instruction: "Search Tech Bros and add", chipIcon: "bolt.fill", chipText: "Log Transaction Notification")
+        GuidedStep(number: 4, instruction: "Choose your new shortcut", chipIcon: "bell.badge", chipText: "Log Bank Alert")
     ]
 
-    private func stepsPage(label: String, title: String, steps: [GuidedStep], footnote: String) -> some View {
+    private func stepsPage(label: String, title: String, steps: [GuidedStep], footnote: String, addStage: Stage) -> some View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -234,6 +440,19 @@ struct AutoCaptureOnboardingView: View {
                         .foregroundStyle(Monolith.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 26)
+
+                    Button {
+                        advance(to: addStage)
+                    } label: {
+                        Text("Missed the shortcut? Add it again")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Monolith.secondary)
+                            .underline()
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("AutoCaptureReAddShortcut")
+                    .padding(.top, 12)
                 }
                 .padding(.horizontal, 28)
                 .padding(.top, 12)
@@ -305,7 +524,7 @@ struct AutoCaptureOnboardingView: View {
 
             if isNotificationTriggerAvailable && !completedNotificationSteps {
                 Button {
-                    advance(to: .notificationSteps)
+                    advance(to: .notificationAddShortcut)
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "bell.badge")

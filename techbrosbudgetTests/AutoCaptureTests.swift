@@ -143,6 +143,13 @@ struct AutoCaptureEnrollmentTests {
         #expect(defaults.object(forKey: AutoCaptureEnrollment.firstCaptureDefaultsKey) as? Date == firstDate)
     }
 
+    @Test func bundledShortcutFilesArePresent() {
+        // The onboarding's one-tap import depends on these signed files
+        // being copied into the app bundle by the synchronized group.
+        #expect(AutoCaptureShortcut.wallet.fileURL != nil)
+        #expect(AutoCaptureShortcut.notification.fileURL != nil)
+    }
+
     @Test @MainActor func storeReportsWhenLedgerHoldsAutoCapturedExpenses() {
         let store = BudgetStore(
             categorizer: AutoCaptureStubCategorizer(),

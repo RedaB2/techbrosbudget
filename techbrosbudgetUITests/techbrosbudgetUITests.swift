@@ -94,11 +94,23 @@ final class techbrosbudgetUITests: XCTestCase {
 
         setItUp.tap()
 
+        // First the ready-made shortcut is offered for one-tap import.
+        XCTAssertTrue(app.buttons["AutoCaptureAddShortcut"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Log My Purchase"].exists)
+
+        let addAttachment = XCTAttachment(screenshot: app.screenshot())
+        addAttachment.name = "Auto-capture add shortcut"
+        addAttachment.lifetime = .keepAlways
+        add(addAttachment)
+
+        app.buttons["AutoCaptureContinueToSteps"].tap()
+
         // Guided steps: exact Shortcuts labels are shown as chips.
         XCTAssertTrue(app.buttons["AutoCaptureOpenShortcuts"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Transaction"].exists)
+        XCTAssertTrue(app.staticTexts["Automation"].exists)
+        XCTAssertTrue(app.staticTexts["Wallet"].exists)
         XCTAssertTrue(app.staticTexts["Run Immediately"].exists)
-        XCTAssertTrue(app.staticTexts["Log Wallet Transaction"].exists)
+        XCTAssertTrue(app.staticTexts["Log My Purchase"].exists)
 
         let stepsAttachment = XCTAttachment(screenshot: app.screenshot())
         stepsAttachment.name = "Auto-capture guided steps"
@@ -223,6 +235,198 @@ final class techbrosbudgetUITests: XCTestCase {
         deleteButton.tap()
 
         XCTAssertFalse(row.waitForExistence(timeout: 2))
+    }
+
+    /// End-to-end proof that the bundled signed shortcut really imports into
+    /// the Shortcuts app. Drives system UI and another app, so it's opt-in:
+    /// run with TEST_RUNNER_RUN_CROSSAPP_TESTS=1.
+    @MainActor
+    func testAddShortcutImportsIntoShortcutsApp() throws {
+        try XCTSkipUnless(
+            ProcessInfo.processInfo.environment["RUN_CROSSAPP_TESTS"] == "1",
+            "Cross-app test; set RUN_CROSSAPP_TESTS=1 to run."
+        )
+
+        let app = makePreviewApp()
+        app.launchArguments.append("UITEST_SHOW_AUTOCAPTURE_INTRO")
+        app.launch()
+
+        let setItUp = app.buttons["AutoCaptureSetItUp"]
+        XCTAssertTrue(setItUp.waitForExistence(timeout: 8))
+        setItUp.tap()
+
+        let addShortcut = app.buttons["AutoCaptureAddShortcut"]
+        XCTAssertTrue(addShortcut.waitForExistence(timeout: 3))
+        addShortcut.tap()
+
+        // The open-in sheet lists apps able to import the file; pick Shortcuts.
+        // The sheet is a remote view, so tap by screen coordinates — element
+        // taps frequently don't land across the process boundary.
+        let shortcutsTarget = app.cells["Shortcuts"].firstMatch
+        XCTAssertTrue(shortcutsTarget.waitForExistence(timeout: 8), "Share sheet did not offer Shortcuts")
+        Thread.sleep(forTimeInterval: 1)
+
+        let sheetAttachment = XCTAttachment(screenshot: app.screenshot())
+        sheetAttachment.name = "Open-in sheet with Shortcuts"
+        sheetAttachment.lifetime = .keepAlways
+        add(sheetAttachment)
+
+        let shortcuts = XCUIApplication(bundleIdentifier: "com.apple.shortcuts")
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+
+        // The sheet may be hosted by the app or by SpringBoard depending on
+        // OS version; try whichever exposes the Shortcuts target.
+        let candidates = [
+            shortcutsTarget,
+            springboard.cells["Shortcuts"].firstMatch,
+            springboard.buttons["Shortcuts"].firstMatch,
+            app.buttons["Shortcuts"].firstMatch
+        ]
+
+        for _ in 0..<2 where shortcuts.state != .runningForeground {
+            for candidate in candidates where candidate.exists {
+                candidate.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+                if shortcuts.wait(for: .runningForeground, timeout: 4) {
+                    break
+                }
+            }
+        }
+
+        // Shortcuts foregrounds with its import preview.
+        XCTAssertTrue(shortcuts.wait(for: .runningForeground, timeout: 10))
+
+        let importPreview = XCTAttachment(screenshot: shortcuts.screenshot())
+        importPreview.name = "Shortcuts import preview"
+        importPreview.lifetime = .keepAlways
+        add(importPreview)
+
+        let addButton = shortcuts.buttons["Add Shortcut"].firstMatch
+        XCTAssertTrue(addButton.waitForExistence(timeout: 10), "Shortcuts did not show the Add Shortcut preview")
+        addButton.tap()
+
+        let imported = shortcuts.staticTexts["Log My Purchase"].firstMatch
+        XCTAssertTrue(imported.waitForExistence(timeout: 10), "Imported shortcut not visible in library")
+
+        let libraryAttachment = XCTAttachment(screenshot: shortcuts.screenshot())
+        libraryAttachment.name = "Shortcuts library after import"
+        libraryAttachment.lifetime = .keepAlways
+        add(libraryAttachment)
+    }
+
+    /// Verifies the signed shortcut file itself: opening it hands off to the
+    /// Shortcuts app's import preview and the shortcut lands in the library.
+    /// Requires the file planted in the simulator's Files storage first:
+    /// cp "Log My Purchase.shortcut" "<sim>/data/Containers/Shared/AppGroup/<LocalStorage>/File Provider Storage/".
+    /// Opt-in: run with TEST_RUNNER_RUN_CROSSAPP_TESTS=1.
+    @MainActor
+    func testSignedShortcutFileImportsViaFilesApp() throws {
+        try XCTSkipUnless(
+            ProcessInfo.processInfo.environment["RUN_CROSSAPP_TESTS"] == "1",
+            "Cross-app test; set RUN_CROSSAPP_TESTS=1 to run."
+        )
+
+        let files = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
+        files.launch()
+        XCTAssertTrue(files.wait(for: .runningForeground, timeout: 10))
+
+        // Get to the local storage root.
+        let browseTab = files.buttons["Browse"].firstMatch
+        if browseTab.waitForExistence(timeout: 5) {
+            browseTab.tap()
+            browseTab.tap()
+        }
+
+        let onMyIphone = files.staticTexts["On My iPhone"].firstMatch
+        if onMyIphone.waitForExistence(timeout: 5) {
+            onMyIphone.tap()
+        }
+
+        let fileCell = files.cells
+            .matching(NSPredicate(format: "label CONTAINS %@", "Log My Purchase"))
+            .firstMatch
+        XCTAssertTrue(fileCell.waitForExistence(timeout: 8), "Planted shortcut file not visible in Files")
+
+        let filesAttachment = XCTAttachment(screenshot: files.screenshot())
+        filesAttachment.name = "Files app with shortcut file"
+        filesAttachment.lifetime = .keepAlways
+        add(filesAttachment)
+
+        // Tap the icon area — tapping the filename label starts a rename.
+        fileCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+
+        // Files may open a QuickLook preview with an "open in Shortcuts"
+        // toolbar button instead of handing off directly.
+        let shortcuts = XCUIApplication(bundleIdentifier: "com.apple.shortcuts")
+        let quickLookOpenButton = files.buttons["Shortcuts"].firstMatch
+
+        if !shortcuts.wait(for: .runningForeground, timeout: 5) {
+            XCTAssertTrue(quickLookOpenButton.waitForExistence(timeout: 8), "No route from Files into Shortcuts")
+            quickLookOpenButton.tap()
+        }
+
+        // Opening the file must hand off to the Shortcuts import preview.
+        XCTAssertTrue(shortcuts.wait(for: .runningForeground, timeout: 15), "Shortcuts did not open the file")
+
+        let previewAttachment = XCTAttachment(screenshot: shortcuts.screenshot())
+        previewAttachment.name = "Shortcuts import preview"
+        previewAttachment.lifetime = .keepAlways
+        add(previewAttachment)
+
+        // The import sheet may be exposed by the Shortcuts app itself or by
+        // its remote-view service; look for the Add button in any host and
+        // fall back to its fixed screen position (bottom center).
+        Thread.sleep(forTimeInterval: 3)
+
+        let addButtonHosts = [
+            shortcuts.buttons["Add Shortcut"].firstMatch,
+            files.buttons["Add Shortcut"].firstMatch
+        ]
+
+        var tappedAdd = false
+        for _ in 0..<3 where !tappedAdd {
+            for button in addButtonHosts where button.exists {
+                button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                tappedAdd = true
+                break
+            }
+
+            if !tappedAdd {
+                Thread.sleep(forTimeInterval: 3)
+            }
+        }
+
+        if !tappedAdd {
+            // Last resort: the blue Add Shortcut bar sits at the bottom
+            // center of the import sheet.
+            shortcuts.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92)).tap()
+        }
+
+        Thread.sleep(forTimeInterval: 4)
+
+        let postAddAttachment = XCTAttachment(screenshot: shortcuts.screenshot())
+        postAddAttachment.name = "Right after Add Shortcut tap"
+        postAddAttachment.lifetime = .keepAlways
+        add(postAddAttachment)
+
+        // Relaunch Shortcuts so the check runs against the real library, not
+        // leftovers of the import sheet.
+        shortcuts.terminate()
+        shortcuts.launch()
+        XCTAssertTrue(shortcuts.wait(for: .runningForeground, timeout: 10))
+        Thread.sleep(forTimeInterval: 2)
+
+        let imported = shortcuts.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS %@", "Purchase"))
+            .firstMatch
+        let importedAppeared = imported.waitForExistence(timeout: 10)
+
+        let libraryAttachment = XCTAttachment(screenshot: shortcuts.screenshot())
+        libraryAttachment.name = "Shortcuts library after import"
+        libraryAttachment.lifetime = .keepAlways
+        add(libraryAttachment)
+
+        XCTAssertTrue(importedAppeared, "Imported shortcut not visible in library")
     }
 
     @MainActor
